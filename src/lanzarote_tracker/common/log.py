@@ -45,11 +45,15 @@ def get_logger(name: str) -> logging.Logger:
     """Devuelve el logger de un modulo, colgado del logger raiz del proyecto.
 
     Args:
-        name: Normalmente ``__name__`` del modulo que llama.
+        name: Normalmente ``__name__`` del modulo que llama. Si vale
+            ``"__main__"``, porque quien llama es un script ejecutado
+            directamente, se sustituye por "cli", que es mas legible en el log.
 
     Returns:
         Un logger hijo de `ROOT_LOGGER_NAME`.
     """
+    if name == "__main__":
+        name = "cli"
     if name.startswith(ROOT_LOGGER_NAME):
         return logging.getLogger(name)
     return logging.getLogger(f"{ROOT_LOGGER_NAME}.{name}")

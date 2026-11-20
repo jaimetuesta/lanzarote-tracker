@@ -50,15 +50,16 @@ def run(config: AppConfig, clip_path: Path, save_video: bool) -> int:
             f"No existe el clip: {clip_path}. Grabalo con "
             "`python scripts/record_clips.py`."
         )
-    recorder = DebugRecorder("tracker", config.debug)
-    detector = create_detector(config.detection)
-    tracker = create_tracker(config.tracking)
-    manager = TrackingManager(detector, tracker, config.tracking)
     raise NotImplementedError(
         "El tracker todavia no esta implementado. Faltan: detection/classic.py, "
         "tracking/optical_flow.py, tracking/manager.py, classification/bow.py, "
         "identification/matcher.py y visualization/hud.py."
     )
+    # Asi quedara el arranque del bucle una vez implementados esos modulos:
+    recorder = DebugRecorder("tracker", config.debug)
+    detector = create_detector(config.detection)
+    tracker = create_tracker(config.tracking)
+    manager = TrackingManager(detector, tracker, config.tracking)
 
 
 def main() -> int:

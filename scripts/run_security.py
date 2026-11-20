@@ -39,14 +39,15 @@ def run(config: AppConfig) -> int:
         NotImplementedError: Mientras el lector y la maquina de estados no esten
             implementados.
     """
-    recorder = DebugRecorder("security", config.debug)
-    reader = StableCardReader(config.security)
-    fsm = SequenceFsm(config.security)
     raise NotImplementedError(
         "El bloque de seguridad todavia no esta implementado. Faltan: "
         "security/segmentation.py, security/shape_classifier.py, "
         "security/card_reader.py y security/sequence_fsm.py."
     )
+    # Asi quedara el arranque del bucle una vez implementados esos modulos:
+    recorder = DebugRecorder("security", config.debug)
+    reader = StableCardReader(config.security)
+    fsm = SequenceFsm(config.security)
 
 
 def main() -> int:

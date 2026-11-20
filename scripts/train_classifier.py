@@ -77,15 +77,29 @@ def main() -> int:
     )
 
     try:
+        # La fabrica valida el backend y rechaza los que estan desactivados a
+        # la espera de la aprobacion del profesor, con su propio mensaje.
         classifier = create_classifier(config.classification)
-        raise NotImplementedError(
-            "El entrenamiento todavia no esta implementado. Faltan: "
-            "capture/frames.py (dataset y splits) y classification/bow.py "
-            "(SIFT + K-means + SVM)."
-        )
-    except (NotImplementedError, ValueError) as error:
+    except ValueError as error:
         _logger.error("%s", error)
         return 1
+    except NotImplementedError as error:
+        if config.classification.backend == "bow":
+            _logger.error(
+                "El entrenamiento todavia no esta implementado. Faltan: "
+                "capture/frames.py (dataset y splits) y classification/bow.py "
+                "(SIFT + K-means + SVM)."
+            )
+        else:
+            _logger.error("%s", error)
+        return 1
+
+    _logger.error(
+        "El entrenamiento todavia no esta implementado: falta cargar el dataset "
+        "de capture/frames.py y llamar a %s.fit.",
+        type(classifier).__name__,
+    )
+    return 1
 
 
 if __name__ == "__main__":
