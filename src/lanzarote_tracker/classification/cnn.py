@@ -1,17 +1,27 @@
-"""Backend `cnn`: red convolucional propia. DESACTIVADO.
+"""Backend `cnn`: red convolucional propia. OPCIONAL.
 
-AVISO: este backend NO forma parte del alcance base. Su uso de deep learning
-esta PENDIENTE DE APROBACION DEL PROFESOR. Mientras tanto:
+El profesor ha aprobado el uso de deep learning, pero con una condicion que
+manda sobre todo lo demas: **esto sigue siendo un proyecto de vision por
+ordenador tradicional**. En consecuencia:
 
-- `config.classification.backend` vale "bow" por defecto.
-- El entorno NO incluye ningun framework de deep learning; en `environment.yml`
-  estan comentados con una nota.
-- El constructor falla con un mensaje explicito en vez de importar nada.
+- el backend por defecto sigue siendo `bow` (SIFT + K-means + SVM), que es la
+  LINEA BASE del proyecto;
+- la CNN es la ALTERNATIVA con la que comparar en el informe, no el camino
+  principal, y no se empieza hasta que `bow` este terminado y medido: sin la
+  linea base no hay con que comparar, y la comparacion es justamente lo que
+  hace interesante a la CNN en la memoria;
+- los frameworks de deep learning NO entran en el entorno base: se instalan
+  aparte con ``pip install -e ".[dl]"``.
 
 Fuera de las practicas: las redes convolucionales no se vieron en las practicas
-de la asignatura. Si se aprueba su uso, en el informe hay que justificar la
-arquitectura con bibliografia y comparar sus resultados con los del backend
-`bow`, que seguira siendo la linea base.
+de la asignatura. Hay que justificar la arquitectura con bibliografia en el
+informe.
+
+Aviso sobre el dataset: con clips propios el conjunto sera pequeno, asi que lo
+razonable es partir de una red preentrenada y reentrenar solo las ultimas capas
+(transfer learning) en vez de entrenar desde cero. La division sigue siendo POR
+CLIPS COMPLETOS: con una CNN, dos fotogramas casi identicos repartidos entre
+entrenamiento y validacion inflan las metricas todavia mas que con `bow`.
 """
 
 from __future__ import annotations
@@ -28,10 +38,11 @@ from lanzarote_tracker.config import ClassificationConfig
 Image = np.ndarray
 
 #: Mensaje unico para no repetirlo en cada metodo.
-_PENDING_APPROVAL = (
-    "El backend de clasificacion 'cnn' esta DESACTIVADO: usa deep learning y su "
-    "uso esta pendiente de aprobacion del profesor. Usa el backend 'bow' "
-    "(config.classification.backend = 'bow')."
+_NOT_IMPLEMENTED = (
+    "El backend de clasificacion 'cnn' todavia no esta implementado. Es la "
+    "alternativa opcional con deep learning: la linea base del proyecto es el "
+    "backend 'bow' (SIFT + K-means + SVM), que debe estar terminado y medido "
+    "antes, para poder comparar. Instala el extra con `pip install -e \".[dl]\"`."
 )
 
 
@@ -45,35 +56,35 @@ class CnnOrientationClassifier(OrientationClassifier):
     name = "cnn"
 
     def __init__(self, config: ClassificationConfig) -> None:
-        """Rechaza la construccion mientras el backend este pendiente de aprobacion.
+        """Inicializa el clasificador sin entrenar.
+
+        No importa aqui ningun framework de deep learning: el import va dentro
+        de :meth:`fit` y :meth:`load`, para que construir el objeto (y por tanto
+        importar el paquete y pasar los tests) no exija tener instalado el extra.
 
         Args:
             config: Configuracion de clasificacion.
-
-        Raises:
-            NotImplementedError: Siempre, mientras no se apruebe el uso de deep
-                learning.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        self.config: ClassificationConfig = config
 
     def fit(self, images: Sequence[Image], labels: Sequence[str]) -> None:
-        """Entrenaria la CNN con los recortes de entrenamiento.
+        """Entrenara la CNN con los recortes de entrenamiento.
 
         Args:
             images: Recortes de entrenamiento.
-            labels: Etiqueta de cada recorte.
+            labels: Etiqueta de cada recorte, "front" o "back".
 
         Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+            NotImplementedError: Todavia no implementado.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        raise NotImplementedError(_NOT_IMPLEMENTED)
 
     def predict(
         self,
         image: Image,
         recorder: Optional[DebugRecorder] = None,
     ) -> Orientation:
-        """Clasificaria la orientacion con la CNN.
+        """Clasificara la orientacion con la CNN.
 
         Args:
             image: Recorte del avion.
@@ -83,12 +94,12 @@ class CnnOrientationClassifier(OrientationClassifier):
             La orientacion y su confianza.
 
         Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+            NotImplementedError: Todavia no implementado.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        raise NotImplementedError(_NOT_IMPLEMENTED)
 
     def save(self, directory: Path) -> Tuple[Path, ...]:
-        """Guardaria los pesos entrenados.
+        """Guardara los pesos entrenados en `models/`, que no se versiona.
 
         Args:
             directory: Directorio de destino.
@@ -97,29 +108,29 @@ class CnnOrientationClassifier(OrientationClassifier):
             Las rutas escritas.
 
         Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+            NotImplementedError: Todavia no implementado.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        raise NotImplementedError(_NOT_IMPLEMENTED)
 
     def load(self, directory: Path) -> None:
-        """Cargaria los pesos entrenados.
+        """Cargara los pesos entrenados.
 
         Args:
             directory: Directorio donde estan los pesos.
 
         Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+            NotImplementedError: Todavia no implementado.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        raise NotImplementedError(_NOT_IMPLEMENTED)
 
     @property
     def is_fitted(self) -> bool:
-        """Indicaria si la red esta entrenada o cargada.
+        """True si la red esta entrenada o cargada.
 
-        Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+        Returns:
+            De momento siempre False: la red no se puede entrenar todavia.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        return False
 
 
 __all__ = ["CnnOrientationClassifier"]

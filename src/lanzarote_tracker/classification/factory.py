@@ -20,8 +20,6 @@ def create_classifier(config: ClassificationConfig) -> OrientationClassifier:
 
     Raises:
         ValueError: Si el backend no esta en `config.available_backends`.
-        NotImplementedError: Si se pide el backend "cnn", que esta desactivado
-            a la espera de la aprobacion del profesor.
     """
     backend = config.backend.lower()
     if backend not in config.available_backends:

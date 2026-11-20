@@ -215,12 +215,12 @@ python -m pytest -q
 | `capture.recorder` | Clips con metadatos UTC | Pendiente |
 | `capture.frames` | Fotogramas y división por clips | Pendiente |
 | `detection.classic` | Segmentación del avión por color y morfología | Pendiente |
-| `detection.coco` | Detector preentrenado | **Desactivado** |
+| `detection.coco` | Detector preentrenado | Opcional, pendiente |
 | `tracking.optical_flow` | Lucas-Kanade sobre puntos Shi-Tomasi | Pendiente |
 | `tracking.mean_shift` | meanShift sobre histograma de tono | Pendiente |
 | `tracking.manager` | Detectar cada K + seguir | Pendiente |
 | `classification.bow` | SIFT + K-means + SVM | Pendiente |
-| `classification.cnn` | CNN propia | **Desactivado** |
+| `classification.cnn` | CNN propia | Opcional, pendiente |
 | `classification.arrival_departure` | Llegada o salida | Pendiente |
 | `identification` | OpenSky, emparejamiento, ficha | Pendiente |
 | `visualization` | Cajas, ficha, FPS incrustado | Pendiente |
@@ -260,13 +260,18 @@ Dos consideraciones para el informe:
 
 ## Notas
 
-**Backends pendientes de aprobación del profesor.** Los módulos con varios backends
-eligen el suyo desde `config.py`. Los backends `coco` (detección) y `cnn`
-(clasificación) usan *deep learning* y están **desactivados**: su uso está pendiente de
-aprobación del profesor. Mientras tanto, los backends por defecto son `classic` y `bow`,
-que se apoyan en técnicas vistas en las prácticas de la asignatura. El entorno **no**
-incluye ningún framework de *deep learning*; en `environment.yml` están comentados con
-una nota.
+**Deep learning: aprobado, pero secundario.** El profesor aprobó el uso de *deep
+learning* el 20/11/2026, con la condición de que **esto sigue siendo un proyecto de
+visión por ordenador tradicional**. Por eso los backends por defecto **no cambian**:
+`classic` (detección) y `bow` (clasificación), que se apoyan en técnicas vistas en las
+prácticas. Los backends `coco` y `cnn` son **alternativas opcionales** con las que
+comparar en el informe, y no se empiezan hasta que la línea clásica esté terminada y
+medida: sin `bow` entrenado no hay con qué comparar la CNN. Sus dependencias quedan
+fuera del entorno base, en un extra que se instala aparte:
+
+```bash
+pip install -e ".[dl]"
+```
 
 **Los clips no se publican.** Los clips grabados del directo y los fotogramas extraídos
 quedan fuera del repositorio: `data/` está en `.gitignore` salvo su `README.md`. La

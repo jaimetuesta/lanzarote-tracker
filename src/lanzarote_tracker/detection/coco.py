@@ -1,17 +1,22 @@
-"""Backend `coco`: detector preentrenado sobre la clase `airplane`. DESACTIVADO.
+"""Backend `coco`: detector preentrenado sobre la clase `airplane`. OPCIONAL.
 
-AVISO: este backend NO forma parte del alcance base. Usa un modelo de deep
-learning preentrenado y su uso esta PENDIENTE DE APROBACION DEL PROFESOR. Por
-eso:
+El profesor ha aprobado el uso de deep learning, pero con una condicion que
+manda sobre todo lo demas: **esto sigue siendo un proyecto de vision por
+ordenador tradicional**. En consecuencia:
 
-- `config.detection.backend` vale "classic" por defecto.
-- El entorno NO incluye ningun framework de deep learning; en `environment.yml`
-  estan comentados con una nota.
-- El constructor falla con un mensaje explicito en vez de intentar cargar pesos.
+- el backend por defecto sigue siendo `classic`, que no usa deep learning;
+- este backend es una ALTERNATIVA con la que comparar en el informe, no el
+  camino principal, y no se empieza hasta que `classic` este terminado;
+- los frameworks de deep learning NO entran en el entorno base: se instalan
+  aparte con ``pip install -e ".[dl]"``.
 
 Fuera de las practicas: la deteccion por redes preentrenadas no se vio en
-clase. Si se aprueba su uso, en el informe hay que justificar el modelo elegido
-con bibliografia y comparar sus resultados con los del backend `classic`.
+clase, asi que el modelo elegido hay que justificarlo con bibliografia en el
+informe y comparar sus resultados con los del backend `classic`.
+
+CUIDADO con el indice de la clase: hay dos convenciones de etiquetas de COCO y
+no coinciden (ver `DetectionConfig.coco_label_convention`). Elegir la
+equivocada no da ningun error, simplemente devuelve otra clase.
 """
 
 from __future__ import annotations
@@ -21,17 +26,10 @@ from typing import List, Optional
 import numpy as np
 
 from lanzarote_tracker.common.debug import DebugRecorder
-from lanzarote_tracker.config import DetectionConfig
+from lanzarote_tracker.config import COCO_AIRPLANE_CLASS_ID, DetectionConfig
 from lanzarote_tracker.detection.base import Detection, PlaneDetector
 
 Image = np.ndarray
-
-#: Mensaje unico para no repetirlo en cada metodo.
-_PENDING_APPROVAL = (
-    "El backend de deteccion 'coco' esta DESACTIVADO: usa deep learning y su "
-    "uso esta pendiente de aprobacion del profesor. Usa el backend 'classic' "
-    "(config.detection.backend = 'classic')."
-)
 
 
 class CocoPlaneDetector(PlaneDetector):
@@ -44,26 +42,40 @@ class CocoPlaneDetector(PlaneDetector):
     name = "coco"
 
     def __init__(self, config: DetectionConfig) -> None:
-        """Rechaza la construccion mientras el backend este pendiente de aprobacion.
+        """Inicializa el detector y comprueba la coherencia de las etiquetas.
 
         Args:
             config: Configuracion de deteccion.
 
         Raises:
-            NotImplementedError: Siempre, mientras no se apruebe el uso de deep
-                learning.
+            ValueError: Si `coco_label_convention` no es una de las conocidas, o
+                si `coco_airplane_class_id` no corresponde a esa convencion.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        expected = COCO_AIRPLANE_CLASS_ID.get(config.coco_label_convention)
+        if expected is None:
+            raise ValueError(
+                f"Convencion de etiquetas COCO desconocida: "
+                f"{config.coco_label_convention!r}. "
+                f"Disponibles: {', '.join(COCO_AIRPLANE_CLASS_ID)}."
+            )
+        if config.coco_airplane_class_id != expected:
+            raise ValueError(
+                f"La convencion {config.coco_label_convention!r} situa la clase "
+                f"'airplane' en el indice {expected}, pero la configuracion dice "
+                f"{config.coco_airplane_class_id}. Con un indice equivocado el "
+                "detector devuelve otra clase sin dar ningun error."
+            )
+        self.config: DetectionConfig = config
 
     def detect(
         self,
         frame: Image,
         recorder: Optional[DebugRecorder] = None,
     ) -> List[Detection]:
-        """Detectaria los aviones con el modelo preentrenado.
+        """Detecta los aviones con el modelo preentrenado.
 
-        Filtraria las cajas por `config.coco_airplane_class_id` (clase
-        `airplane` de COCO) y por `config.coco_confidence_threshold`.
+        Filtrara las cajas por `config.coco_airplane_class_id` (clase
+        `airplane`) y por `config.coco_confidence_threshold`.
 
         Args:
             frame: Fotograma BGR del clip.
@@ -73,9 +85,16 @@ class CocoPlaneDetector(PlaneDetector):
             Lista de detecciones ordenada por confianza.
 
         Raises:
-            NotImplementedError: Siempre, mientras el backend este desactivado.
+            NotImplementedError: Todavia no implementado. Es una alternativa
+                opcional: primero hay que terminar el backend `classic`.
         """
-        raise NotImplementedError(_PENDING_APPROVAL)
+        raise NotImplementedError(
+            "El backend de deteccion 'coco' todavia no esta implementado. "
+            "Es la alternativa opcional con deep learning: el camino principal "
+            "del proyecto es el backend 'classic'. Antes de implementarlo hay "
+            "que elegir modelo, instalar el extra con `pip install -e \".[dl]\"` "
+            "y fijar config.detection.coco_label_convention."
+        )
 
 
 __all__ = ["CocoPlaneDetector"]

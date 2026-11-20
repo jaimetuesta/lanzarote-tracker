@@ -18,9 +18,8 @@ def create_detector(config: DetectionConfig) -> PlaneDetector:
         Una instancia de :class:`~lanzarote_tracker.detection.base.PlaneDetector`.
 
     Raises:
-        ValueError: Si el backend no esta en `config.available_backends`.
-        NotImplementedError: Si se pide el backend "coco", que esta desactivado
-            a la espera de la aprobacion del profesor.
+        ValueError: Si el backend no esta en `config.available_backends`, o si
+            la convencion de etiquetas del backend "coco" es incoherente.
     """
     backend = config.backend.lower()
     if backend not in config.available_backends:

@@ -14,8 +14,8 @@ yt-dlp
 requests
 pytest
 
-# --- Deep learning: NO instalar todavia -------------------------------------
-# Backends `coco` y `cnn`, opcionales y PENDIENTES DE APROBACION DEL PROFESOR.
-# torch
-# torchvision
-# ultralytics
+# --- Deep learning: fuera del entorno base ----------------------------------
+# Aprobado por el profesor, pero el proyecto sigue siendo de vision tradicional:
+# los backends por defecto (`classic` y `bow`) no necesitan nada de esto.
+# Para los backends opcionales `coco` y `cnn`:
+#     pip install -e ".[dl]"

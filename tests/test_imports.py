@@ -64,11 +64,12 @@ def test_factories_reject_unknown_backends() -> None:
         create_classifier(replace(config.classification, backend="inventado"))
 
 
-def test_deep_learning_backends_are_disabled() -> None:
-    """Los backends de deep learning fallan con un mensaje claro.
+def test_deep_learning_backends_can_be_built() -> None:
+    """Los backends de deep learning ya se pueden construir.
 
-    Siguen desactivados mientras su uso este pendiente de aprobacion del
-    profesor.
+    El profesor aprobo su uso, asi que la fabrica deja de rechazarlos. Construir
+    el objeto NO importa ningun framework de deep learning: los imports van
+    dentro de los metodos, para que el entorno base siga sin necesitarlos.
     """
     from dataclasses import replace
 
@@ -77,10 +78,45 @@ def test_deep_learning_backends_are_disabled() -> None:
     from lanzarote_tracker.detection.factory import create_detector
 
     config = get_config()
-    with pytest.raises(NotImplementedError, match="aprobacion del profesor"):
-        create_detector(replace(config.detection, backend="coco"))
-    with pytest.raises(NotImplementedError, match="aprobacion del profesor"):
-        create_classifier(replace(config.classification, backend="cnn"))
+    assert create_detector(replace(config.detection, backend="coco")).name == "coco"
+    assert (
+        create_classifier(replace(config.classification, backend="cnn")).name == "cnn"
+    )
+
+
+def test_deep_learning_backends_are_not_implemented_yet() -> None:
+    """Usarlos todavia falla, indicando que la linea principal es la clasica."""
+    from dataclasses import replace
+
+    import numpy as np
+
+    from lanzarote_tracker.classification.factory import create_classifier
+    from lanzarote_tracker.config import get_config
+    from lanzarote_tracker.detection.factory import create_detector
+
+    config = get_config()
+    frame = np.zeros((64, 64, 3), dtype=np.uint8)
+
+    detector = create_detector(replace(config.detection, backend="coco"))
+    with pytest.raises(NotImplementedError, match="classic"):
+        detector.detect(frame)
+
+    classifier = create_classifier(replace(config.classification, backend="cnn"))
+    with pytest.raises(NotImplementedError, match="bow"):
+        classifier.predict(frame)
+
+
+def test_classical_backends_remain_the_default() -> None:
+    """Aprobar el deep learning NO cambia los backends por defecto.
+
+    El proyecto sigue siendo de vision por ordenador tradicional: `coco` y
+    `cnn` son alternativas opcionales con las que comparar en el informe.
+    """
+    from lanzarote_tracker.config import get_config
+
+    config = get_config()
+    assert config.detection.backend == "classic"
+    assert config.classification.backend == "bow"
 
 
 def test_extensions_are_not_implemented() -> None:

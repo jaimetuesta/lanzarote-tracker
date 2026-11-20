@@ -150,6 +150,39 @@ def test_default_backends_are_the_classic_ones() -> None:
     assert config.classification.backend == "bow"
 
 
+def test_coco_class_id_matches_its_convention() -> None:
+    """El indice de `airplane` concuerda con la convencion de etiquetas elegida.
+
+    Hay dos convenciones de COCO y no coinciden: 4 en las 80 clases contiguas
+    de YOLO y 5 en los ids originales que usan los modelos de torchvision.
+    Equivocarse no da ningun error, solo hace que el detector devuelva otra
+    clase, asi que conviene fijarlo con un test.
+    """
+    from lanzarote_tracker.config import COCO_AIRPLANE_CLASS_ID
+
+    detection = get_config().detection
+    assert detection.coco_label_convention in COCO_AIRPLANE_CLASS_ID
+    assert (
+        detection.coco_airplane_class_id
+        == COCO_AIRPLANE_CLASS_ID[detection.coco_label_convention]
+    )
+
+
+def test_coco_detector_rejects_an_inconsistent_class_id() -> None:
+    """Una combinacion incoherente de convencion e indice se rechaza al construir."""
+    from lanzarote_tracker.detection.factory import create_detector
+
+    config = get_config()
+    broken = replace(
+        config.detection,
+        backend="coco",
+        coco_label_convention="paper91",
+        coco_airplane_class_id=4,
+    )
+    with pytest.raises(ValueError, match="airplane"):
+        create_detector(broken)
+
+
 def test_configured_backends_are_available() -> None:
     """El backend elegido de cada modulo esta en su lista de disponibles."""
     config = get_config()

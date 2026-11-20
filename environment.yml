@@ -26,11 +26,16 @@ dependencies:
       - yt-dlp
       - requests
       - pytest
-      # --- Deep learning: NO instalar todavia ---------------------------------
-      # Los backends `coco` (deteccion) y `cnn` (clasificacion) son OPCIONALES y
-      # estan PENDIENTES DE APROBACION DEL PROFESOR. Hasta que se apruebe su uso
-      # no se anade ningun framework de deep learning al entorno. Si se aprueba,
-      # descomentar la linea que corresponda y documentarlo en el informe:
-      # - torch
-      # - torchvision
-      # - ultralytics
+      # --- Deep learning: fuera del entorno base ------------------------------
+      # El profesor ha APROBADO el uso de deep learning, pero el proyecto sigue
+      # siendo de vision por ordenador tradicional: los backends por defecto son
+      # `classic` (deteccion) y `bow` (clasificacion), que no necesitan nada de
+      # esto. Los backends `coco` y `cnn` son alternativas OPCIONALES con las
+      # que comparar en el informe.
+      #
+      # Por eso torch y torchvision NO se instalan aqui, para que este entorno
+      # siga siendo el de la asignatura. Cuando hagan falta:
+      #
+      #     pip install -e ".[dl]"
+      #
+      # (ver el extra `dl` de pyproject.toml).

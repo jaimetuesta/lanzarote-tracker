@@ -76,18 +76,29 @@ No las reabras sin que te lo pidan.
 - **Dataset:** división train/val/test **por clips completos**, nunca por fotogramas.
   Los clips **no se publican** (fuera de git).
 
-## Restricciones de deep learning
+## Deep learning: aprobado, pero secundario
 
-Los backends `coco` y `cnn` usan deep learning y su uso está **pendiente de aprobación
-del profesor**. Mientras no se apruebe:
+El profesor **aprobó el uso de deep learning** (20/11/2026), con una condición que manda
+sobre todo lo demás: **esto sigue siendo un proyecto de visión por ordenador
+tradicional**. En la práctica:
 
-- su constructor lanza `NotImplementedError` con un mensaje que lo explica;
-- **no añadas ningún framework de deep learning** a `environment.yml` ni a
-  `requirements.txt`: están comentados con una nota;
-- los backends por defecto siguen siendo `classic` y `bow`.
+- **los backends por defecto NO cambian**: siguen siendo `classic` (detección) y `bow`
+  (clasificación). No los cambies;
+- `coco` y `cnn` son **alternativas opcionales** con las que comparar en el informe, no
+  el camino principal;
+- **no se empiezan hasta que la línea clásica esté terminada y medida**. Sin `bow`
+  entrenado no hay con qué comparar la CNN, y la comparación es justamente lo que la
+  hace interesante en la memoria;
+- los frameworks **no entran en el entorno base**: van en el extra opcional
+  `pip install -e ".[dl]"` (ver `pyproject.toml`), para que `environment.yml` siga
+  siendo el entorno de la asignatura;
+- si implementas `coco`, fija antes `config.detection.coco_label_convention`: hay **dos**
+  convenciones de etiquetas de COCO y no coinciden (`airplane` es la 4 en las 80 clases
+  contiguas de YOLO y la 5 en los ids originales que usan los modelos de torchvision).
+  Equivocarse no da ningún error, simplemente devuelve otra clase.
 
-**Tampoco añadas `opencv-contrib-python`.** El proyecto usa solo el paquete base de
-OpenCV; SIFT está en el módulo principal desde la 4.4.
+Sigue en pie: **no añadas `opencv-contrib-python`**. El proyecto usa solo el paquete base
+de OpenCV; SIFT está en el módulo principal desde la 4.4.
 
 ## Regla general: priorizar las prácticas de la asignatura
 

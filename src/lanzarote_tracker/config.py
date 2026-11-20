@@ -34,6 +34,10 @@ PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
 #: Valor maximo del canal de tono H en OpenCV.
 MAX_HUE: int = 179
 
+#: Indice de la clase `airplane` en cada convencion de etiquetas de COCO.
+#: Ver `DetectionConfig.coco_label_convention`.
+COCO_AIRPLANE_CLASS_ID: Dict[str, int] = {"contiguous80": 4, "paper91": 5}
+
 
 # ---------------------------------------------------------------------------
 # Rutas
@@ -239,10 +243,11 @@ class DetectionConfig:
 
     Backends disponibles:
       - ``classic``: segmentacion propia del avion frente a cielo y pista por
-        color y morfologia. ES EL BACKEND POR DEFECTO.
-      - ``coco``: detector preentrenado (clase ``airplane``). OPCIONAL y
-        DESACTIVADO: su uso de deep learning esta PENDIENTE DE APROBACION DEL
-        PROFESOR.
+        color y morfologia. ES EL BACKEND POR DEFECTO y la linea principal.
+      - ``coco``: detector preentrenado (clase ``airplane``). OPCIONAL. El
+        profesor ha aprobado el uso de deep learning, pero el proyecto sigue
+        siendo de vision por ordenador tradicional: este backend es una
+        alternativa con la que comparar en el informe, no el camino principal.
     """
 
     backend: str = "classic"
@@ -262,11 +267,23 @@ class DetectionConfig:
     min_aspect_ratio: float = 0.3
     max_aspect_ratio: float = 6.0
 
-    # --- Backend coco (DESACTIVADO) ------------------------------------------
-    #: Indice de la clase `airplane` en COCO.
+    # --- Backend coco (OPCIONAL) ---------------------------------------------
+    #: Convencion de indices de clase de COCO que usa el detector elegido. Hay
+    #: DOS y NO coinciden:
+    #:   - "contiguous80": las 80 clases contiguas con las que trabajan YOLO y
+    #:     ultralytics. Ahi `airplane` es la 4.
+    #:   - "paper91": los ids originales del dataset COCO, que son los que
+    #:     devuelven los modelos preentrenados de torchvision. Ahi `airplane`
+    #:     es la 5.
+    #: Confundirlas NO da ningun error: el detector devuelve otra clase
+    #: (motocicletas en vez de aviones) y el fallo se manifiesta como "el
+    #: detector no funciona". Al elegir modelo hay que fijar esto primero.
+    coco_label_convention: str = "contiguous80"
+    #: Indice de la clase `airplane` segun `coco_label_convention`. El test
+    #: `test_coco_class_id_matches_its_convention` comprueba que son coherentes.
     coco_airplane_class_id: int = 4
     coco_confidence_threshold: float = 0.5
-    #: Ruta a los pesos del detector. Vacia porque el backend esta desactivado.
+    #: Ruta a los pesos del detector. Vacia hasta elegir modelo.
     coco_weights_path: str = ""
 
 
@@ -323,8 +340,11 @@ class ClassificationConfig:
 
     Backends disponibles:
       - ``bow``: bolsa de palabras SIFT + K-means + SVM (Practica 5, apartado A).
-        ES LA LINEA BASE.
-      - ``cnn``: CNN propia. OPCIONAL y PENDIENTE DE APROBACION DEL PROFESOR.
+        ES LA LINEA BASE y el backend por defecto.
+      - ``cnn``: CNN propia. OPCIONAL. El profesor ha aprobado el uso de deep
+        learning, pero el proyecto sigue siendo de vision por ordenador
+        tradicional: la CNN es la alternativa con la que comparar en el
+        informe, y `bow` sigue siendo la linea base.
     """
 
     backend: str = "bow"
@@ -345,9 +365,12 @@ class ClassificationConfig:
     vocabulary_filename: str = "bow_vocabulary.npz"
     classifier_filename: str = "bow_svm.joblib"
 
-    # --- Backend cnn (DESACTIVADO) -------------------------------------------
+    # --- Backend cnn (OPCIONAL) ----------------------------------------------
     cnn_input_size: Tuple[int, int] = (128, 128)
     cnn_weights_filename: str = "cnn_orientation.weights"
+    cnn_batch_size: int = 32
+    cnn_epochs: int = 20
+    cnn_learning_rate: float = 1e-3
 
     # --- Division del dataset ------------------------------------------------
     #: La division SIEMPRE es por clips completos, nunca por fotogramas: dos
@@ -495,6 +518,7 @@ def with_debug(config: AppConfig, enabled: bool = True) -> AppConfig:
 
 __all__ = [
     "MAX_HUE",
+    "COCO_AIRPLANE_CLASS_ID",
     "PROJECT_ROOT",
     "DEFAULT_HSV_RANGES",
     "HsvRange",
