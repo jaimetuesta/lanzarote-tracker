@@ -51,6 +51,14 @@ data/splits/*
 models/*
 !models/.gitkeep
 
+# --- Fotos del tablero de calibracion ---------------------------------------
+# Las fotos NO se versionan (unos 19 MB). Lo que si se versiona es el resultado
+# de la calibracion, en calibration/results/: K, distorsion y RMS en .npz y
+# .json, que es lo que necesita el informe. El .json documenta con que patron y
+# cuantas fotos se obtuvo.
+calibration/images/*
+!calibration/images/.gitkeep
+
 # --- Video ------------------------------------------------------------------
 *.mp4
 *.avi
