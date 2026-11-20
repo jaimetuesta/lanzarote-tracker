@@ -100,8 +100,13 @@ class CalibrationConfig:
     """Parametros del tablero de ajedrez y de la calibracion pinhole."""
 
     #: Esquinas internas del tablero (columnas, filas), no numero de cuadrados.
-    pattern_size: Tuple[int, int] = (9, 6)
+    #: Medido sobre el tablero real del proyecto con
+    #: `python scripts/calibrate_camera.py --detect-pattern`.
+    pattern_size: Tuple[int, int] = (8, 6)
     #: Lado del cuadrado del tablero impreso, en milimetros.
+    #: Solo fija la escala de la escena: afecta a los vectores de traslacion,
+    #: pero NO a la matriz K ni a los coeficientes de distorsion, que es lo
+    #: unico que usa este proyecto.
     square_size_mm: float = 25.0
     #: Numero minimo de imagenes validas para dar la calibracion por buena.
     min_images: int = 15
