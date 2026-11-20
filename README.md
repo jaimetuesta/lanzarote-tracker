@@ -129,8 +129,8 @@ Todos los scripts aceptan `--help`.
 | `scripts/capture_calibration_images.py` | Fotos del tablero con la webcam (ESPACIO) | Funciona |
 | `scripts/generate_cards.py` | Genera las 16 tarjetas imprimibles | Funciona |
 | `scripts/tune_hsv.py` | Trackbars para ajustar rangos HSV en vivo (H de 0 a 179) | Funciona |
+| `scripts/calibrate_camera.py` | Calibra y guarda K, distorsión y RMS | Funciona |
 | `scripts/main.py` | Flujo completo; sin opciones, webcam con FPS | Parcial |
-| `scripts/calibrate_camera.py` | Calibra y guarda K, distorsión y RMS | Pendiente |
 | `scripts/run_security.py` | Solo el desbloqueo con la webcam | Pendiente |
 | `scripts/record_clips.py` | Graba clips del directo con metadatos | Pendiente |
 | `scripts/extract_frames.py` | Extrae fotogramas de los clips | Pendiente |
@@ -207,7 +207,7 @@ python -m pytest -q
 | `common` | io de imágenes y vídeo, FPS, logging, `DebugRecorder` | **Hecho** |
 | `capture.stream_url` | URL del directo con yt-dlp | **Hecho** |
 | `security.types` | Formas, colores, tarjeta, estados | **Hecho** |
-| `calibration` | Tablero, calibración pinhole, corrección, guardado | Pendiente |
+| `calibration` | Tablero, calibración pinhole, corrección, guardado | **Hecho** |
 | `security.segmentation` | HSV, morfología, contorno mayor | Pendiente |
 | `security.shape_classifier` | `approxPolyDP` + circularidad | Pendiente |
 | `security.card_reader` | Validación temporal de N fotogramas | Pendiente |
@@ -225,6 +225,36 @@ python -m pytest -q
 | `identification` | OpenSky, emparejamiento, ficha | Pendiente |
 | `visualization` | Cajas, ficha, FPS incrustado | Pendiente |
 | `extensions` | Las cuatro ampliaciones | Stubs, NO base |
+
+---
+
+## Calibración de la webcam
+
+Hecha el 20/11/2026 con 19 fotos de un tablero de **8×6 esquinas internas** (cuadrado de
+25 mm), a 1280×720. Los valores están en
+[`calibration/results/`](calibration/results/), en `.npz` y en `.json`.
+
+| | |
+|---|---|
+| Resolución | 1280 × 720 |
+| fx, fy | 886.90, 886.71 px |
+| cx, cy | 599.77, 373.24 px |
+| Distorsión (k1, k2, p1, p2, k3) | 0.0416, −0.1831, 0.0004, −0.0024, 0.1734 |
+| RMS de reproyección | 1.1380 px |
+| Fotos válidas | 19 de 19 |
+
+La calibración vale **solo para 1280×720**: es la resolución a la que hay que trabajar en
+el bloque de seguridad, y `Undistorter` rechaza cualquier otra con un aviso explícito.
+
+Dos consideraciones para el informe:
+
+- El RMS por imagen se normaliza por la **raíz** del número de esquinas, no por el número
+  de esquinas como en el tutorial de OpenCV, de modo que su media cuadrática coincide
+  exactamente con el RMS que devuelve `cv2.calibrateCamera` y las dos cifras son
+  comparables.
+- El error no está repartido: `calib_016` y `calib_005` acumulan el 95,6 % del error
+  total. Apartándolas el RMS bajaría a 0.2482 px y el punto principal se iría a
+  (606.8, 360.1), casi el centro geométrico. Se ha decidido conservar las 19 fotos.
 
 ---
 
