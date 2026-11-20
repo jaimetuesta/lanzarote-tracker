@@ -1,0 +1,78 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Entornos virtuales -----------------------------------------------------
+.venv/
+venv/
+env/
+.conda/
+
+# --- Credenciales -----------------------------------------------------------
+.env
+*.env
+!.env.example
+
+# --- Jupyter ----------------------------------------------------------------
+.ipynb_checkpoints/
+notebooks/**/*.nbconvert.ipynb
+
+# --- Datos: no se publican los clips del stream -----------------------------
+data/*
+!data/README.md
+!data/.gitkeep
+!data/clips/
+!data/frames/
+!data/annotations/
+!data/splits/
+data/clips/*
+data/frames/*
+data/annotations/*
+data/splits/*
+!data/clips/.gitkeep
+!data/frames/.gitkeep
+!data/annotations/.gitkeep
+!data/splits/.gitkeep
+
+# --- Modelos entrenados (vocabularios BoW, SVM, pesos) ----------------------
+models/*
+!models/.gitkeep
+
+# --- Video ------------------------------------------------------------------
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.webm
+*.m3u8
+*.ts
+
+# --- Caches de yt-dlp -------------------------------------------------------
+.cache/
+yt-dlp-cache/
+*.part
+*.ytdl
+*.info.json
+
+# --- Sistema operativo ------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+._*
+
+# --- Editores ---------------------------------------------------------------
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,36 @@
+# Entorno Conda del proyecto LanzaroteTracker.
+# Parte del entorno de la asignatura Vision por Ordenador I y solo anade
+# lo imprescindible: yt-dlp, requests y pytest.
+#
+#   conda env create -f environment.yml
+#   conda activate lanzarote-tracker
+#   pip install -e .
+name: lanzarote-tracker
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9.21
+  - numpy=1.26.0
+  - scikit-image=0.24.0
+  - imageio=2.36.1
+  - matplotlib=3.9
+  - scikit-learn
+  - pandas
+  - tqdm
+  - jupyter
+  - pip
+  - pip:
+      # OpenCV se instala por pip para fijar exactamente la version de la asignatura.
+      # NO anadir opencv-contrib-python: la asignatura trabaja con el paquete base.
+      - opencv-python==4.8.0.76
+      - yt-dlp
+      - requests
+      - pytest
+      # --- Deep learning: NO instalar todavia ---------------------------------
+      # Los backends `coco` (deteccion) y `cnn` (clasificacion) son OPCIONALES y
+      # estan PENDIENTES DE APROBACION DEL PROFESOR. Hasta que se apruebe su uso
+      # no se anade ningun framework de deep learning al entorno. Si se aprueba,
+      # descomentar la linea que corresponda y documentarlo en el informe:
+      # - torch
+      # - torchvision
+      # - ultralytics
