@@ -90,9 +90,10 @@ def run_security(config: AppConfig) -> int:
         NotImplementedError: Mientras el bloque de seguridad no este implementado.
     """
     raise NotImplementedError(
-        "El bloque de seguridad todavia no esta implementado. "
-        "Faltan: security/segmentation.py, security/shape_classifier.py, "
-        "security/card_reader.py y security/sequence_fsm.py. "
+        "El bloque de seguridad todavia no esta completo. La maquina de "
+        "estados ya esta implementada; faltan la vision: "
+        "security/segmentation.py, security/shape_classifier.py y "
+        "security/card_reader.py. "
         "Ejecuta `python scripts/main.py` sin opciones para la vista previa de "
         "la webcam, que si funciona."
     )

@@ -143,9 +143,9 @@ Todos los scripts aceptan `--help`.
 | `scripts/calibrate_camera.py` | Calibra y guarda K, distorsión y RMS | Funciona |
 | `scripts/main.py` | Flujo completo; sin opciones, webcam con FPS | Parcial |
 | `scripts/run_security.py` | Solo el desbloqueo con la webcam | Pendiente |
-| `scripts/record_clips.py` | Graba clips del directo con metadatos | Pendiente |
-| `scripts/extract_frames.py` | Extrae fotogramas de los clips | Pendiente |
-| `scripts/build_dataset.py` | División train/val/test por clips completos | Pendiente |
+| `scripts/record_clips.py` | Graba clips del directo con metadatos | Funciona |
+| `scripts/extract_frames.py` | Extrae fotogramas de los clips | Funciona |
+| `scripts/build_dataset.py` | División train/val/test por clips completos | Funciona |
 | `scripts/train_classifier.py` | Entrena el clasificador de orientación | Pendiente |
 | `scripts/run_tracker.py` | Detección + seguimiento + clasificación + ficha | Pendiente |
 
@@ -223,9 +223,9 @@ python -m pytest -q
 | `security.segmentation` | HSV, morfología, contorno mayor | Pendiente |
 | `security.shape_classifier` | `approxPolyDP` + circularidad | Pendiente |
 | `security.card_reader` | Validación temporal de N fotogramas | Pendiente |
-| `security.sequence_fsm` | Máquina de estados del desbloqueo | Pendiente |
-| `capture.recorder` | Clips con metadatos UTC | Pendiente |
-| `capture.frames` | Fotogramas y división por clips | Pendiente |
+| `security.sequence_fsm` | Máquina de estados del desbloqueo | **Hecho** |
+| `capture.recorder` | Clips con metadatos UTC, disparo por ADS-B | **Hecho** |
+| `capture.frames` | Fotogramas y división por clips | **Hecho** |
 | `detection.classic` | Segmentación del avión por color y morfología | Pendiente |
 | `detection.coco` | Detector preentrenado | Opcional, pendiente |
 | `tracking.optical_flow` | Lucas-Kanade sobre puntos Shi-Tomasi | Pendiente |

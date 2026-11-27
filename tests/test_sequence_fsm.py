@@ -1,14 +1,10 @@
 """Tests de la maquina de estados del desbloqueo.
 
-Estos tests estan escritos CONTRA LA INTERFAZ de
-:class:`~lanzarote_tracker.security.sequence_fsm.SequenceFsm`, que todavia no
-esta implementada, asi que todo el modulo esta marcado como `xfail`: mientras
-los metodos lancen `NotImplementedError` los tests saldran como XFAIL y no
-rompen la bateria.
-
-Al implementar la maquina, estos tests deberian pasar a XPASS uno a uno; cuando
-pasen todos, hay que QUITAR el `pytestmark` de abajo para que a partir de
-entonces protejan de regresiones de verdad.
+Estos tests se escribieron CONTRA LA INTERFAZ de
+:class:`~lanzarote_tracker.security.sequence_fsm.SequenceFsm` antes de
+implementarla, y estuvieron marcados como `xfail` mientras tanto. La maquina ya
+esta implementada y el marcador se ha retirado: desde aqui protegen de
+regresiones de verdad.
 
 La maquina es logica pura (no toca OpenCV ni la camara) y recibe el tiempo
 desde fuera en `FrameObservation.timestamp`, de modo que estos tests controlan
@@ -25,15 +21,6 @@ import pytest
 from lanzarote_tracker.config import SecurityConfig, get_config
 from lanzarote_tracker.security.sequence_fsm import FrameObservation, SequenceFsm
 from lanzarote_tracker.security.types import Card, Color, SecurityState, Shape
-
-# Mientras la maquina no este implementada, todo el modulo es xfail.
-# QUITAR esta linea cuando SequenceFsm este terminada.
-pytestmark = pytest.mark.xfail(
-    raises=NotImplementedError,
-    reason="SequenceFsm todavia no esta implementada (security/sequence_fsm.py).",
-    strict=False,
-)
-
 
 # --- Utilidades de los tests ------------------------------------------------
 def make_card(shape: str, color: str) -> Card:
@@ -345,3 +332,101 @@ def test_status_message_is_a_non_empty_string(fsm: SequenceFsm) -> None:
     message = fsm.status_message()
     assert isinstance(message, str)
     assert message
+
+
+# --- Decisiones de diseno que conviene dejar fijadas ------------------------
+def test_timeout_does_not_count_as_a_failure(
+    fsm: SequenceFsm, correct_cards: List[Card], config: SecurityConfig
+) -> None:
+    """Agotar el tiempo aborta el intento pero NO acerca el bloqueo.
+
+    Quien se va a medio desbloquear no esta atacando nada, y como la secuencia
+    solo se comprueba al final, abortar a mitad no revela ni una posicion. Si
+    los tiempos agotados sumasen fallo, dejar la tarjeta a medias tres veces
+    bloquearia el sistema sin motivo.
+    """
+    for attempt in range(3):
+        start = attempt * 100.0
+        timestamp = feed_gap(fsm, start, config.gap_frames)
+        feed(fsm, correct_cards[0], timestamp)
+        feed(
+            fsm,
+            None,
+            timestamp + config.max_seconds_without_card + 1.0,
+            card_visible=False,
+        )
+    assert fsm.failed_attempts == 0
+    assert fsm.is_locked is False
+
+
+def test_error_is_visible_for_one_frame_then_clears(
+    fsm: SequenceFsm, correct_cards: List[Card], config: SecurityConfig
+) -> None:
+    """El aviso de secuencia incorrecta dura un fotograma.
+
+    Lo justo para que la interfaz pueda mostrarlo; despues se vuelve a
+    Esperando para no dejar la pantalla clavada en el error.
+    """
+    wrong = list(correct_cards)
+    wrong[-1] = make_card("square", "red")
+    timestamp = feed_sequence(fsm, wrong, config)
+    assert fsm.state is SecurityState.ERROR
+    feed(fsm, None, timestamp, card_visible=False)
+    assert fsm.state is SecurityState.WAITING
+
+
+def test_checking_is_never_observed_from_outside(
+    fsm: SequenceFsm, correct_cards: List[Card], config: SecurityConfig
+) -> None:
+    """La comprobacion se atraviesa dentro de la misma llamada a update.
+
+    Quien recibe el estado ve ya el resultado, no el paso intermedio.
+    """
+    states = []
+    timestamp = 0.0
+    for card in correct_cards:
+        timestamp = feed_gap(fsm, timestamp, config.gap_frames)
+        states.append(feed(fsm, card, timestamp))
+        timestamp += 0.04
+    assert SecurityState.CHECKING not in states
+    assert states[-1] is SecurityState.UNLOCKED
+
+
+def test_lockout_countdown_decreases(
+    fsm: SequenceFsm, correct_cards: List[Card], config: SecurityConfig
+) -> None:
+    """Los segundos restantes del bloqueo bajan con el tiempo observado."""
+    wrong = list(correct_cards)
+    wrong[-1] = make_card("square", "red")
+    timestamp = 0.0
+    for _ in range(config.max_failed_attempts):
+        timestamp = feed_sequence(fsm, wrong, config, start=timestamp)
+
+    full = fsm.seconds_left_locked
+    feed(fsm, None, timestamp + 10.0, card_visible=False)
+    assert fsm.seconds_left_locked < full
+    assert fsm.seconds_left_locked > 0
+
+
+def test_status_message_follows_the_state(
+    fsm: SequenceFsm, correct_cards: List[Card], config: SecurityConfig
+) -> None:
+    """El mensaje cambia con el estado y dice por que tarjeta se va."""
+    assert "1" in fsm.status_message()
+    timestamp = feed_gap(fsm, 0.0, config.gap_frames)
+    feed(fsm, correct_cards[0], timestamp)
+    assert "2" in fsm.status_message()
+    feed_sequence(fsm, correct_cards[1:], config, start=timestamp + 0.04)
+    assert fsm.status_message() == "Desbloqueado"
+
+
+def test_the_first_card_needs_no_previous_gap(
+    fsm: SequenceFsm, correct_cards: List[Card]
+) -> None:
+    """Nada mas arrancar se acepta una tarjeta sin esperar fotogramas vacios.
+
+    Exigir un hueco que nadie ha visto todavia solo retrasaria el primer
+    desbloqueo sin aportar nada.
+    """
+    feed(fsm, correct_cards[0], 0.0)
+    assert len(fsm.read_cards) == 1

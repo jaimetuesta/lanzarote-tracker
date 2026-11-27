@@ -36,13 +36,14 @@ def run(config: AppConfig) -> int:
         0 si el usuario se desbloquea, 1 si no.
 
     Raises:
-        NotImplementedError: Mientras el lector y la maquina de estados no esten
-            implementados.
+        NotImplementedError: Mientras el lector de tarjetas no este
+            implementado. La maquina de estados ya lo esta.
     """
     raise NotImplementedError(
-        "El bloque de seguridad todavia no esta implementado. Faltan: "
-        "security/segmentation.py, security/shape_classifier.py, "
-        "security/card_reader.py y security/sequence_fsm.py."
+        "El bloque de seguridad todavia no esta completo. La maquina de "
+        "estados (security/sequence_fsm.py) YA esta implementada; faltan la "
+        "vision: security/segmentation.py, security/shape_classifier.py y "
+        "security/card_reader.py."
     )
     # Asi quedara el arranque del bucle una vez implementados esos modulos:
     recorder = DebugRecorder("security", config.debug)

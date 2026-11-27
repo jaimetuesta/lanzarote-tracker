@@ -188,7 +188,10 @@ disponibles ahí; sí `cv2.TrackerMIL_create` y `cv2.TrackerGOTURN_create`.
 
 ## Tests
 
-`tests/` con pytest. De momento hay tests reales de la configuración y de la importación
-de todos los módulos. Los de la máquina de estados están escritos contra su interfaz y
-marcados como `xfail`: al implementarla pasarán a XPASS y hay que **quitar el
-`pytestmark`** de `tests/test_sequence_fsm.py`.
+`tests/` con pytest, todos reales y sin `xfail` pendientes. Cubren la configuración, la
+importación de todos los módulos, la calibración (con un tablero sintético), la
+identificación (con dobles, sin red), la captura (con clips sintéticos) y la máquina de
+estados del desbloqueo.
+
+Si implementas algo que hoy es un stub, mira antes si ya hay tests escritos contra su
+interfaz: varios módulos los tienen.
