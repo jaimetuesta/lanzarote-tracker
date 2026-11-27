@@ -104,6 +104,14 @@ class SequenceFsm:
         # Se arranca como si ya hubiera habido hueco: la primera tarjeta no
         # tiene por que esperar a que pasen fotogramas vacios que nadie ha visto.
         self._empty_frames: int = config.gap_frames
+        #: Fotogramas vacios que hubo ANTES de que apareciera la tarjeta que se
+        #: esta viendo ahora. Es lo que decide si una lectura se acepta, no el
+        #: hueco en el instante de confirmarla: para cuando el lector confirma,
+        #: la tarjeta lleva ya N fotogramas a la vista y el hueco vale 0.
+        self._gap_before_streak: int = config.gap_frames
+        #: Si en el fotograma anterior se veia una tarjeta, para saber cuando
+        #: empieza una racha nueva.
+        self._card_was_visible: bool = False
         self._last_card_seen: Optional[float] = None
         self._lockout_until: Optional[float] = None
         self._now: float = 0.0
@@ -169,9 +177,10 @@ class SequenceFsm:
         4. Tiempo agotado: con una lectura en curso y mas de
            `max_seconds_without_card` segundos sin ver tarjeta, se aborta el
            intento (sin sumar fallo).
-        5. Hueco entre lecturas: una tarjeta confirmada solo se acepta si antes
-           se han visto al menos `gap_frames` fotogramas sin tarjeta; si no, se
-           ignora.
+        5. Hueco entre lecturas: una tarjeta confirmada solo se acepta si hubo
+           al menos `gap_frames` fotogramas sin tarjeta ANTES de ensenarla. No
+           vale mirar el hueco en el instante de confirmarla: para entonces la
+           tarjeta lleva N fotogramas a la vista y ese hueco siempre es 0.
         6. Tarjeta confirmada: se anade a `read_cards`. Si ya hay
            `sequence_length`, se pasa a CHECKING y se compara la secuencia
            ENTERA con `config.expected_sequence`: si coincide, UNLOCKED; si no,
@@ -202,17 +211,21 @@ class SequenceFsm:
         if self._state is SecurityState.ERROR:
             self._state = SecurityState.WAITING
 
-        # 4. Tiempo maximo sin ver ninguna tarjeta, con un intento empezado.
+        # 4. Se actualizan los contadores ANTES de decidir sobre la tarjeta: el
+        # hueco que cuenta es el que precedio a esta racha de visibilidad, y la
+        # racha puede empezar en este mismo fotograma.
+        self._track_visibility(observation)
+
+        # 5. Tiempo maximo sin ver ninguna tarjeta, con un intento empezado.
         if self._timed_out(observation):
             self._clear_attempt()
             self._state = SecurityState.WAITING
 
-        # 5 y 6. Tarjeta confirmada, si el hueco previo lo permite.
+        # 6. Tarjeta confirmada, si hubo hueco suficiente antes de ensenarla.
         card = observation.confirmed_card
-        if card is not None and self._empty_frames >= self.config.gap_frames:
+        if card is not None and self._gap_before_streak >= self.config.gap_frames:
             self._accept(card)
 
-        self._track_visibility(observation)
         return self._state
 
     def _timed_out(self, observation: FrameObservation) -> bool:
@@ -238,6 +251,9 @@ class SequenceFsm:
             card: Tarjeta confirmada.
         """
         self._read_cards.append(card)
+        # Se consume el hueco: sin retirar la tarjeta no puede haber otra
+        # lectura, aunque el lector volviera a confirmar.
+        self._gap_before_streak = 0
         if len(self._read_cards) < self.config.sequence_length:
             self._state = SecurityState.READING
             return
@@ -269,25 +285,33 @@ class SequenceFsm:
         return read == expected
 
     def _track_visibility(self, observation: FrameObservation) -> None:
-        """Actualiza los contadores de fotogramas vacios y de ultima tarjeta.
+        """Actualiza los contadores de visibilidad.
 
-        Se hace DESPUES de decidir sobre la tarjeta de este fotograma: el hueco
-        que cuenta es el que precede a la lectura, no el que la incluye.
+        La clave esta en `_gap_before_streak`. El lector de tarjetas necesita N
+        fotogramas con la tarjeta A LA VISTA para confirmarla, asi que en el
+        momento de la confirmacion el hueco inmediato siempre vale 0. Lo que
+        hay que exigir es que hubiera hueco ANTES de que apareciera esa
+        tarjeta, y eso se captura al empezar cada racha de visibilidad.
 
         Args:
             observation: Lo observado en este fotograma.
         """
         if observation.card_visible:
+            if not self._card_was_visible:
+                # Empieza una racha: se guarda el hueco que la precedio.
+                self._gap_before_streak = self._empty_frames
             self._empty_frames = 0
             self._last_card_seen = observation.timestamp
         else:
             self._empty_frames += 1
+        self._card_was_visible = observation.card_visible
 
     def _clear_attempt(self) -> None:
         """Vacia las tarjetas leidas y los contadores del intento en curso."""
         self._read_cards.clear()
         self._last_card_seen = None
         self._empty_frames = self.config.gap_frames
+        self._gap_before_streak = self.config.gap_frames
 
     def reset(self, clear_failures: bool = False) -> None:
         """Aborta el intento en curso y vuelve a WAITING.
