@@ -274,3 +274,27 @@ def test_replace_allows_overriding_a_single_block() -> None:
     variant = replace(config, debug=DebugConfig(enabled=True, log_level="DEBUG"))
     assert variant.debug.log_level == "DEBUG"
     assert variant.security == config.security
+
+
+def test_colour_hue_ranges_do_not_overlap() -> None:
+    """Dos colores de tarjeta no pueden compartir ningun tono.
+
+    Si se solaparan, una misma tarjeta podria segmentarse como dos colores
+    distintos segun la luz, y el desbloqueo fallaria de forma intermitente.
+    Es la comprobacion que hay que repetir cada vez que se remidan los rangos.
+    """
+    hues_by_colour = {}
+    for colour, ranges in get_config().security.hsv_ranges.items():
+        covered = set()
+        for low, high in ranges:
+            covered.update(range(low[0], high[0] + 1))
+        hues_by_colour[colour] = covered
+
+    names = sorted(hues_by_colour)
+    for first_index, first in enumerate(names):
+        for second in names[first_index + 1 :]:
+            shared = hues_by_colour[first] & hues_by_colour[second]
+            assert not shared, (
+                f"'{first}' y '{second}' comparten los tonos {sorted(shared)}: "
+                "vuelve a medirlos con scripts/tune_hsv.py"
+            )

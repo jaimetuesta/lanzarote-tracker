@@ -140,11 +140,13 @@ def sample_hsv_range(
     if not wrapped:
         return (((low_hue, sat_low, val_low), (high_hue, 255, 255)),)
 
-    # Dos tramos: del limite inferior al final del circulo, y del principio
-    # hasta el limite superior.
+    # Dos tramos, en orden ascendente de tono para que coincidan con como se
+    # escribe el rojo en `DEFAULT_HSV_RANGES`: primero el que arranca en 0 y
+    # despues el que termina en 179. El orden no afecta a la mascara, que los
+    # une con un OR, pero asi la linea que se imprime se pega tal cual.
     return (
-        ((low_hue, sat_low, val_low), (MAX_HUE, 255, 255)),
         ((0, sat_low, val_low), (high_hue, 255, 255)),
+        ((low_hue, sat_low, val_low), (MAX_HUE, 255, 255)),
     )
 
 

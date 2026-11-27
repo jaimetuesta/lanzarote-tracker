@@ -135,16 +135,23 @@ class CalibrationConfig:
 # ---------------------------------------------------------------------------
 #: Rangos HSV por color de tarjeta. El rojo necesita DOS rangos porque su tono
 #: esta partido por el extremo del circulo cromatico (cerca de 0 y cerca de 179).
-#: Son valores de partida: se afinan con `scripts/tune_hsv.py` sobre las
-#: tarjetas impresas reales y con la iluminacion real.
+#:
+#: MEDIDOS el 27/11/2026 con `scripts/tune_hsv.py` sobre las tarjetas mostradas
+#: EN LA PANTALLA DE UN IPAD, no impresas. Una pantalla reproduce casi exactos
+#: los colores que `generate_cards.py` genera, asi que este es el caso FACIL:
+#: hay que volver a medirlos sobre las tarjetas impresas antes de dar por buena
+#: la robustez del sistema, y contar las dos medidas en el informe.
 DEFAULT_HSV_RANGES: Dict[str, Tuple[HsvRange, ...]] = {
+    # TODO: el segundo tramo del rojo esta a medias. Al medirlo, la ventana
+    # solo mostraba el tramo (170..179) y el otro se perdio con el fallo de
+    # impresion; el 10 de aqui es provisional y hay que volver a medir el rojo.
     "red": (
-        ((0, 120, 70), (10, 255, 255)),
-        ((170, 120, 70), (MAX_HUE, 255, 255)),
+        ((0, 170, 133), (10, 255, 255)),
+        ((170, 170, 133), (MAX_HUE, 255, 255)),
     ),
-    "green": (((36, 80, 70), (89, 255, 255)),),
-    "blue": (((90, 80, 70), (130, 255, 255)),),
-    "yellow": (((20, 100, 100), (35, 255, 255)),),
+    "green": (((60, 190, 137), (77, 255, 255)),),
+    "blue": (((98, 175, 192), (114, 255, 255)),),
+    "yellow": (((19, 129, 98), (35, 255, 255)),),
 }
 
 
