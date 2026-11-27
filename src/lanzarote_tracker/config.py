@@ -227,8 +227,9 @@ class CaptureConfig:
     #: FourCC del codec de cv2.VideoWriter y extension del fichero.
     fourcc: str = "mp4v"
     clip_extension: str = ".mp4"
-    #: FPS con los que se escribe el clip si el stream no informa de los suyos.
+    #: FPS con los que se escribe el clip si no se pueden medir.
     fallback_fps: float = 25.0
+
     #: Sufijo del JSON de metadatos que acompana a cada clip.
     metadata_suffix: str = ".json"
     #: Formato de la marca de tiempo UTC de inicio del clip (ISO 8601).
