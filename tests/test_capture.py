@@ -325,3 +325,63 @@ def test_reading_missing_splits_is_reported(tmp_path: Path) -> None:
     paths = replace(get_config().paths, splits=tmp_path / "vacio")
     with pytest.raises(FileNotFoundError, match="build_dataset"):
         read_splits(paths)
+
+
+# --- Disparo por trafico real -----------------------------------------------
+def test_high_overflight_does_not_trigger() -> None:
+    """Un avion de crucero sobre el aeropuerto no es una operacion."""
+    from lanzarote_tracker.capture.trigger import is_operating
+    from lanzarote_tracker.config import get_config
+
+    config = get_config()
+    assert is_operating({"alt_baro": 35000}, config) is False
+
+
+def test_low_aircraft_triggers() -> None:
+    """Un avion bajo y cerca justifica grabar."""
+    from lanzarote_tracker.capture.trigger import is_operating
+    from lanzarote_tracker.config import get_config
+
+    config = get_config()
+    assert is_operating({"alt_baro": 1200}, config) is True
+
+
+def test_aircraft_on_ground_triggers() -> None:
+    """Un avion en tierra tambien: puede estar a punto de despegar."""
+    from lanzarote_tracker.capture.trigger import is_operating
+    from lanzarote_tracker.config import get_config
+
+    assert is_operating({"alt_baro": "ground"}, get_config()) is True
+
+
+def test_aircraft_without_altitude_does_not_trigger() -> None:
+    """Sin altura utilizable no se puede decidir, asi que no se graba."""
+    from lanzarote_tracker.capture.trigger import is_operating
+    from lanzarote_tracker.config import get_config
+
+    assert is_operating({}, get_config()) is False
+
+
+def test_active_aircraft_filters_the_list() -> None:
+    """De una lista mezclada solo quedan los que operan."""
+    from lanzarote_tracker.capture.trigger import active_aircraft
+    from lanzarote_tracker.config import get_config
+
+    aircraft = [
+        {"hex": "alto", "alt_baro": 35000},
+        {"hex": "bajo", "alt_baro": 900},
+        {"hex": "suelo", "alt_baro": "ground"},
+    ]
+    found = active_aircraft(aircraft, get_config())
+    assert [item["hex"] for item in found] == ["bajo", "suelo"]
+
+
+def test_trigger_thresholds_are_wider_than_the_runway_ones() -> None:
+    """El disparo vigila mas lejos y mas alto que la deteccion de operaciones.
+
+    Si se esperase a que el avion ya estuviera EN la pista, se empezaria a
+    grabar con el aterrizaje ya hecho.
+    """
+    config = get_config()
+    assert config.capture.trigger_radius_nm > config.identification.search_radius_nm
+    assert config.capture.trigger_altitude_ft > config.identification.max_altitude_ft

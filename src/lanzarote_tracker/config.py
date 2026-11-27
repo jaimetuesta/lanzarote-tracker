@@ -234,6 +234,22 @@ class CaptureConfig:
     metadata_suffix: str = ".json"
     #: Formato de la marca de tiempo UTC de inicio del clip (ISO 8601).
     timestamp_format: str = "%Y%m%dT%H%M%SZ"
+    # --- Disparo por trafico real --------------------------------------------
+    #: Grabar a ciegas desperdicia disco y tiempo: fuera de las horas punta la
+    #: pista esta vacia casi siempre. Con `--when-active` se vigila ADS-B y solo
+    #: se graba cuando hay un avion operando de verdad.
+    #: Radio de vigilancia, en millas nauticas. Mayor que el de la pista para
+    #: tener margen: un avion en aproximacion entra aqui antes de tomar tierra.
+    trigger_radius_nm: int = 12
+    #: Altura por debajo de la cual un avion dentro del radio se considera en
+    #: aproximacion o despegando, no de paso.
+    trigger_altitude_ft: int = 6000
+    #: Segundos entre consultas a ADS-B mientras se espera.
+    trigger_poll_seconds: int = 15
+    #: Segundos de espera tras grabar antes de poder volver a disparar, para no
+    #: encadenar clips del mismo avion.
+    trigger_cooldown_seconds: int = 45
+
     #: Al extraer fotogramas, guardar uno de cada `frame_step`.
     frame_step: int = 5
     frame_extension: str = ".png"

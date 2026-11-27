@@ -20,6 +20,7 @@ import argparse
 from dataclasses import replace
 
 from lanzarote_tracker.capture.recorder import record_clips
+from lanzarote_tracker.capture.trigger import watch_and_record
 from lanzarote_tracker.capture.stream_url import get_stream_url
 from lanzarote_tracker.common.log import get_logger, setup_logging
 from lanzarote_tracker.config import get_config
@@ -35,9 +36,10 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Graba clips del directo de Flightradar24 del aeropuerto de "
-            "Lanzarote, cada uno con un JSON de metadatos con su marca de "
-            "tiempo UTC de inicio."
+            "Graba clips del directo del aeropuerto de Lanzarote, cada uno con "
+            "un JSON de metadatos con su marca de tiempo UTC de inicio. Con "
+            "--when-active solo graba cuando ADS-B dice que hay un avion "
+            "operando, que es lo recomendable."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -53,6 +55,21 @@ def main() -> int:
         "--url", default=config.capture.stream_url, help="URL de la pagina del directo."
     )
     parser.add_argument(
+        "--when-active",
+        action="store_true",
+        help=(
+            "Vigilar ADS-B y grabar SOLO cuando haya un avion operando. Fuera "
+            "de las horas punta la pista esta vacia casi siempre, asi que "
+            "grabar a ciegas llena el disco de nada."
+        ),
+    )
+    parser.add_argument(
+        "--max-minutes",
+        type=float,
+        default=None,
+        help="Con --when-active, minutos maximos de vigilancia.",
+    )
+    parser.add_argument(
         "--url-only",
         action="store_true",
         help="Solo extraer e imprimir la URL directa del stream, sin grabar.",
@@ -66,7 +83,19 @@ def main() -> int:
         if args.url_only:
             print(get_stream_url(args.url, config.capture))
             return 0
-        clips = record_clips(args.count, config.paths, config.capture, seconds=args.seconds)
+        if args.when_active:
+            clips = watch_and_record(
+                config,
+                seconds=args.seconds,
+                max_clips=args.count,
+                max_wait_seconds=(
+                    args.max_minutes * 60.0 if args.max_minutes else None
+                ),
+            )
+        else:
+            clips = record_clips(
+                args.count, config.paths, config.capture, seconds=args.seconds
+            )
     except (NotImplementedError, RuntimeError) as error:
         _logger.error("%s", error)
         return 1

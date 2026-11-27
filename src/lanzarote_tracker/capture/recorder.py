@@ -144,25 +144,43 @@ def nominal_fps(capture: cv2.VideoCapture, config: CaptureConfig) -> float:
     return config.fallback_fps
 
 
-def record_clip(
-    stream_url: str,
+def open_stream(stream_url: str) -> cv2.VideoCapture:
+    """Abre el stream del directo con el backend FFMPEG.
+
+    Args:
+        stream_url: URL directa del stream.
+
+    Returns:
+        La captura ya abierta.
+
+    Raises:
+        RuntimeError: Si OpenCV no puede abrirla.
+    """
+    capture = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+    if not capture.isOpened():
+        capture.release()
+        raise RuntimeError(
+            "No se pudo abrir el stream en OpenCV. Comprueba la conexion y que "
+            "el directo sigue emitiendo."
+        )
+    return capture
+
+
+def record_from_capture(
+    capture: cv2.VideoCapture,
     output_dir: Path,
     seconds: float,
     config: CaptureConfig,
     source_url: str = "",
 ) -> ClipMetadata:
-    """Graba un clip del stream y escribe su JSON de metadatos.
+    """Graba un clip desde un stream YA ABIERTO y escribe su JSON.
 
-    La marca de tiempo se toma JUSTO antes de escribir el primer fotograma, no
-    al abrir el stream: abrirlo puede tardar varios segundos y ese desfase
-    estropearia el cruce con las fichas de vuelo.
-
-    La duracion se mide con el reloj, no contando fotogramas, porque un directo
-    puede entregarlos a un ritmo distinto del que declara.
+    Separarlo de :func:`record_clip` permite tener el stream abierto esperando
+    y empezar a escribir en cuanto hace falta. Abrirlo tarda unos segundos, y
+    esos segundos son justo los del aterrizaje que se quiere capturar.
 
     Args:
-        stream_url: URL directa del stream, la que devuelve
-            `capture.stream_url.get_stream_url`.
+        capture: Captura ya abierta del directo.
         output_dir: Directorio donde se guardan el clip y su JSON.
         seconds: Duracion a grabar.
         config: Configuracion de captura.
@@ -172,17 +190,9 @@ def record_clip(
         Los metadatos del clip grabado.
 
     Raises:
-        RuntimeError: Si no se puede abrir el stream, leer el primer fotograma
-            o crear el VideoWriter.
+        RuntimeError: Si no llega ningun fotograma o no se puede crear el
+            VideoWriter.
     """
-    capture = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
-    if not capture.isOpened():
-        capture.release()
-        raise RuntimeError(
-            "No se pudo abrir el stream en OpenCV. Comprueba la conexion y que "
-            "el directo sigue emitiendo."
-        )
-
     writer: Optional[cv2.VideoWriter] = None
     try:
         ok, frame = capture.read()
@@ -249,7 +259,6 @@ def record_clip(
     finally:
         if writer is not None:
             writer.release()
-        capture.release()
 
     json_path = metadata_path_for(clip_path, config)
     json_path.write_text(
@@ -272,6 +281,40 @@ def record_clip(
         metadata.started_at_utc,
     )
     return metadata
+
+
+def record_clip(
+    stream_url: str,
+    output_dir: Path,
+    seconds: float,
+    config: CaptureConfig,
+    source_url: str = "",
+) -> ClipMetadata:
+    """Abre el stream, graba un clip y lo cierra.
+
+    La marca de tiempo se toma JUSTO antes de escribir el primer fotograma, no
+    al abrir el stream: abrirlo puede tardar varios segundos y ese desfase
+    estropearia el cruce con las fichas de vuelo.
+
+    Args:
+        stream_url: URL directa del stream, la que devuelve
+            `capture.stream_url.get_stream_url`.
+        output_dir: Directorio donde se guardan el clip y su JSON.
+        seconds: Duracion a grabar.
+        config: Configuracion de captura.
+        source_url: URL de la pagina del directo, solo informativa.
+
+    Returns:
+        Los metadatos del clip grabado.
+
+    Raises:
+        RuntimeError: Si no se puede abrir el stream o grabar.
+    """
+    capture = open_stream(stream_url)
+    try:
+        return record_from_capture(capture, output_dir, seconds, config, source_url)
+    finally:
+        capture.release()
 
 
 def load_clip_metadata(clip_path: Path, config: CaptureConfig) -> ClipMetadata:
@@ -374,6 +417,8 @@ def record_clips(
 __all__ = [
     "ClipMetadata",
     "nominal_fps",
+    "open_stream",
+    "record_from_capture",
     "build_clip_name",
     "metadata_path_for",
     "record_clip",

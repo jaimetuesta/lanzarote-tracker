@@ -21,6 +21,11 @@ from lanzarote_tracker.capture.recorder import (
     record_clips,
 )
 from lanzarote_tracker.capture.stream_url import get_stream_url
+from lanzarote_tracker.capture.trigger import (
+    active_aircraft,
+    is_operating,
+    watch_and_record,
+)
 
 __all__ = [
     "SPLIT_NAMES",
@@ -38,4 +43,7 @@ __all__ = [
     "record_clip",
     "record_clips",
     "get_stream_url",
+    "active_aircraft",
+    "is_operating",
+    "watch_and_record",
 ]
