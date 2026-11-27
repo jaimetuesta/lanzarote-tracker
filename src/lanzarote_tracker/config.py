@@ -22,7 +22,7 @@ import os
 import platform
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 # Un rango HSV es (minimo, maximo) con cada extremo en (H, S, V).
 # IMPORTANTE: en OpenCV el tono H va de 0 a 179 (no de 0 a 359).
@@ -57,6 +57,10 @@ class PathsConfig:
     calibration_images: Path = PROJECT_ROOT / "calibration" / "images"
     calibration_results: Path = PROJECT_ROOT / "calibration" / "results"
     cards: Path = PROJECT_ROOT / "assets" / "cards"
+    #: Datos de referencia que SI se versionan (base de aeropuertos).
+    reference_data: Path = PROJECT_ROOT / "assets" / "data"
+    #: Fichas de vuelo registradas durante el seguimiento en vivo.
+    flight_records: Path = PROJECT_ROOT / "data" / "flights"
 
 
 # ---------------------------------------------------------------------------
@@ -392,29 +396,123 @@ class ClassificationConfig:
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class IdentificationConfig:
-    """Parametros del cliente de OpenSky y del emparejamiento avion-vuelo."""
+    """Parametros de la identificacion del vuelo.
+
+    FUENTES DE DATOS. Hay dos caminos y el primario NO es OpenSky:
+
+    - **ADS-B (primario)**: `adsb.lol` y `adsb.fi` dan los aviones que hay ahora
+      mismo alrededor del aeropuerto, y `adsbdb.com` da modelo, matricula,
+      aerolinea y ruta. No necesitan credenciales y responden AL MOMENTO.
+    - **OpenSky (secundario)**: sus consultas de llegadas y salidas por
+      aeropuerto solo estan disponibles AL DIA SIGUIENTE, asi que no sirven
+      para rellenar la ficha mientras se graba. Se conserva porque permite
+      confirmar a posteriori lo deducido y porque su cobertura es distinta.
+    """
 
     #: Codigos del aeropuerto de Lanzarote.
     airport_icao: str = "GCRR"
     airport_iata: str = "ACE"
-    #: Recuadro geografico alrededor del aeropuerto: (lat_min, lat_max, lon_min, lon_max).
+    #: Nombre que se muestra en la ficha cuando el otro extremo de la ruta es ACE.
+    airport_label: str = "ACE (Lanzarote Island)"
+    #: Centro de la busqueda de aviones: cabecera del aeropuerto.
+    airport_lat: float = 28.945
+    airport_lon: float = -13.605
+    #: Recuadro geografico para OpenSky: (lat_min, lat_max, lon_min, lon_max).
     bbox: Tuple[float, float, float, float] = (28.85, 29.05, -13.70, -13.50)
-    base_url: str = "https://opensky-network.org/api"
-    #: Nombres de las variables de entorno con las credenciales. NUNCA el valor.
-    username_env_var: str = "OPENSKY_USERNAME"
-    password_env_var: str = "OPENSKY_PASSWORD"
+
+    # --- Fuente primaria: ADS-B ----------------------------------------------
+    #: Fuentes de aviones en vivo, en orden. Se prueba la siguiente si una falla.
+    adsb_sources: Tuple[str, ...] = (
+        "https://api.adsb.lol/v2",
+        "https://opendata.adsb.fi/api/v2",
+    )
+    #: Base de datos de aeronaves y rutas.
+    adsbdb_url: str = "https://api.adsbdb.com/v0"
+    #: Radio de busqueda alrededor del aeropuerto, en millas nauticas.
+    search_radius_nm: int = 3
     request_timeout_seconds: float = 15.0
-    #: Ventana temporal de las consultas de llegadas/salidas, en horas.
-    query_window_hours: int = 2
-    #: Campos fijos que se muestran en la ficha. NO se muestran altura,
+
+    # --- Fuente secundaria: OpenSky ------------------------------------------
+    opensky_base_url: str = "https://opensky-network.org/api"
+    #: Endpoint del token OAuth2. OpenSky usa `client_credentials`: NO es
+    #: usuario y contrasena.
+    opensky_token_url: str = (
+        "https://auth.opensky-network.org/auth/realms/opensky-network"
+        "/protocol/openid-connect/token"
+    )
+    #: Nombres de las variables de entorno con las credenciales. NUNCA el valor.
+    client_id_env_var: str = "OPENSKY_CLIENT_ID"
+    client_secret_env_var: str = "OPENSKY_CLIENT_SECRET"
+    #: Margen de seguridad con el que se renueva el token antes de caducar.
+    token_refresh_margin_seconds: float = 60.0
+
+    # --- Deteccion de movimiento en la pista ---------------------------------
+    #: Altura por encima de la cual se considera un vuelo de paso, en pies.
+    max_altitude_ft: int = 5000
+    #: Altura por debajo de la cual se considera que el avion esta en tierra.
+    #: Hace falta porque no todos los aviones emiten el indicador "ground".
+    ground_altitude_ft: int = 100
+    #: Velocidad respecto al suelo minima, en nudos, para no considerar que un
+    #: avion en tierra esta aparcado o rodando despacio.
+    min_ground_speed_kt: int = 30
+    #: Distancia maxima al eje de la pista para contar como "en pista", en metros.
+    runway_margin_m: int = 75
+    #: Velocidad vertical minima, en pies por minuto, para deducir si sube o baja.
+    min_vertical_rate_fpm: int = 300
+    #: Extremos de la pista 03/21 de GCRR, como ((lat, lon), (lat, lon)).
+    #: TODO: rellenar con los umbrales reales de la pista (estan en runways.csv
+    #: de OurAirports, que no venia en el material de Jaime). Mientras sea None,
+    #: un avion en tierra solo cuenta como "en pista" si va a mas de
+    #: `min_ground_speed_kt`, que es mas impreciso.
+    runway_endpoints: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None
+
+    # --- Ritmo del seguimiento en vivo ---------------------------------------
+    #: Segundos entre consultas de la zona del aeropuerto.
+    poll_seconds: int = 10
+    #: Segundos entre consultas de un avion que ya ha despegado.
+    follow_poll_seconds: int = 60
+    #: Segundos tras los cuales se deja de seguir una salida.
+    max_follow_seconds: int = 4 * 3600
+    #: Segundos sin ver un avion para empezar su historial de cero.
+    history_reset_seconds: int = 1800
+    #: Segundos sin ver un avion para darlo por perdido.
+    lost_after_seconds: int = 60
+    #: Si se pierde por debajo de esta altura bajando, se da por aterrizado.
+    lost_below_ft: int = 1000
+    #: Altura por debajo de la cual se supone que una salida perdida ha
+    #: aterrizado cerca de su ultima posicion conocida.
+    landed_below_ft: int = 3000
+
+    # --- Ficha ---------------------------------------------------------------
+    #: Campos FIJOS que se muestran en la ficha. NO se muestran altura,
     #: velocidad ni posicion: el enunciado solo admite datos fijos del avion.
     card_fields: Tuple[str, ...] = (
+        "movement",
         "callsign",
-        "registration",
-        "aircraft_model",
+        "airline",
         "origin",
         "destination",
+        "event_time",
+        "aircraft_model",
+        "registration",
     )
+    #: Etiqueta en espanol de cada campo de la ficha, para mostrarla.
+    card_labels: Dict[str, str] = field(
+        default_factory=lambda: {
+            "movement": "Llegada o salida",
+            "callsign": "Indicativo",
+            "airline": "Aerolinea",
+            "origin": "Origen",
+            "destination": "Destino",
+            "event_time": "Hora",
+            "aircraft_model": "Modelo",
+            "registration": "Matricula",
+        }
+    )
+    #: Texto con el que se rellena un campo desconocido.
+    unknown_value: str = "-"
+    #: Formato de la hora del evento que se muestra en la ficha.
+    event_time_format: str = "%d/%m/%Y %H:%M UTC"
 
 
 # ---------------------------------------------------------------------------

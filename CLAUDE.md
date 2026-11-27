@@ -58,19 +58,33 @@ No las reabras sin que te lo pidan.
   tono; ambos de la Práctica 5).
 - **Detección del avión:** dos backends tras una misma interfaz. `classic` (segmentación
   propia por color y morfología) es el **backend por defecto**; `coco` (detector
-  preentrenado, clase `airplane`) es opcional y está **desactivado**.
+  preentrenado, clase `airplane`) es opcional (ver "Deep learning" más abajo).
 - **Clasificación frente/espaldas:** dos backends tras una interfaz. `bow` (bolsa de
   palabras SIFT + K-means + SVM, Práctica 5 apartado A) es la **línea base**; `cnn` (CNN
-  propia) es opcional y está **desactivada**.
+  propia) es opcional (ver "Deep learning" más abajo).
 - **Captura:** URL del stream con yt-dlp y lectura con `cv2.VideoCapture`; los clips se
   guardan con `cv2.VideoWriter` y un JSON de metadatos con la marca de tiempo UTC de
   inicio.
-- **OpenSky:** vectores de estado en un recuadro geográfico alrededor del aeropuerto;
-  modelo y matrícula desde su base de datos de aeronaves; origen, destino y horas desde
-  las consultas de llegadas/salidas por aeropuerto, que **solo están disponibles al día
-  siguiente**. **No** implementes autenticación ni asumas límites de uso: hay un TODO
-  explícito para verificarlo en la documentación actual de OpenSky. Las credenciales se
-  leen de variables de entorno.
+- **Identificación del vuelo (cambiado el 27/11/2026).** La fuente primaria **ya no es
+  OpenSky**, es **ADS-B**: `adsb.lol` y `adsb.fi` para los aviones que hay ahora sobre la
+  pista, y `adsbdb.com` para modelo, matrícula, aerolínea y ruta. El motivo es que las
+  consultas de llegadas y salidas de OpenSky **solo están disponibles al día siguiente**,
+  así que no sirven para rellenar la ficha mientras se graba; ADS-B responde al momento y
+  no pide credenciales. Lo implementó Jaime y se integró tal cual.
+  OpenSky se conserva como **fuente secundaria** para confirmar a posteriori. Su
+  autenticación es **OAuth2 `client_credentials`** (no usuario y contraseña): ya está
+  implementada y lee `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` del entorno. **Nunca
+  metas un `credentials.json` en el repo**: está en `.gitignore` por esto.
+- **El seguimiento de vuelos hay que ejecutarlo A LA VEZ que se graban los clips**
+  (`scripts/track_flights.py` junto a `scripts/record_clips.py`). Los datos ADS-B son
+  efímeros: un clip grabado sin el seguimiento en marcha se queda sin ficha y ya no hay
+  forma de recuperarla.
+- **Llegada o salida se deduce por DOS vías independientes y no hay que mezclarlas:**
+  `classification/arrival_departure.py` lo hace **por visión** (frente/espaldas + sentido
+  de la pista) y es lo que evalúa el proyecto; `identification/movement.py` lo hace por el
+  historial de alturas ADS-B y sirve de **etiqueta de referencia** para entrenar y medir
+  el clasificador de visión. Usar la segunda para rellenar la primera sería evaluar el
+  sistema contra sí mismo.
 - **La ficha solo lleva datos fijos**: modelo, matrícula, origen, destino. **Nunca**
   altura, velocidad ni posición.
 - **Dataset:** división train/val/test **por clips completos**, nunca por fotogramas.

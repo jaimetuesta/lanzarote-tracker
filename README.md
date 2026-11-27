@@ -20,7 +20,8 @@ clips grabados de ese directo, el sistema:
 2. lo sigue entre fotogramas pese al movimiento de la cámara;
 3. clasifica si se ve de frente o de espaldas y, combinándolo con el sentido de uso de
    la pista, deduce si aterriza o despega;
-4. identifica el vuelo consultando OpenSky Network;
+4. identifica el vuelo cruzando el momento del clip con los datos ADS-B que se
+   registraron mientras se grababa;
 5. superpone una ficha con los datos **fijos** del avión: modelo, matrícula, origen y
    destino. Sin altura, sin velocidad y sin posición.
 
@@ -55,17 +56,24 @@ flowchart TD
         end
     end
 
+    subgraph ADSB["Datos de vuelo (en vivo, a la vez que la captura)"]
+        A1[adsb.lol / adsb.fi<br/>aviones sobre la pista] --> A2[adsbdb<br/>modelo, matrícula, ruta]
+        A2 --> A3[Fichas con marca de tiempo<br/>data/flights/]
+    end
+
     subgraph PROP["Sistema propuesto"]
         P1[Captura: yt-dlp + VideoCapture<br/>clips + metadatos UTC] --> P2[Detección del avión<br/>backend classic]
         P2 --> P3[Tracker: detectar cada K<br/>+ flujo óptico LK / meanShift]
         P3 --> P4[Clasificación frente/espaldas<br/>backend bow: SIFT + K-means + SVM]
         P4 --> P5[Llegada o salida<br/>orientación x cabecera en uso]
-        P5 --> P6[Identificación: OpenSky]
+        P5 --> P6[Identificación: ficha ADS-B<br/>cruzada por marca de tiempo]
         P6 --> P7[Salida de vídeo:<br/>recuadro + ficha + FPS incrustado]
     end
 
     C3 --> S1
     S7 -->|Desbloqueado| P1
+    A3 --> P6
+    P1 -.graba a la vez.-> A1
 
     subgraph EXT["Ampliaciones (NO base)"]
         E1[1. Filtro de Kalman]
@@ -112,7 +120,9 @@ instalación.
 
 ### Credenciales
 
-Las credenciales de OpenSky **nunca** van en el código: se leen de variables de entorno.
+La fuente primaria (ADS-B) **no necesita credenciales**. Las de OpenSky, que es la
+fuente secundaria, son OAuth2 (`client_id` y `client_secret`) y **nunca** van en el
+código: se leen de variables de entorno.
 Copia `.env.example` a `.env` y rellena los valores; `.env` está en `.gitignore`.
 
 ---
@@ -129,6 +139,7 @@ Todos los scripts aceptan `--help`.
 | `scripts/capture_calibration_images.py` | Fotos del tablero con la webcam (ESPACIO) | Funciona |
 | `scripts/generate_cards.py` | Genera las 16 tarjetas imprimibles | Funciona |
 | `scripts/tune_hsv.py` | Trackbars para ajustar rangos HSV en vivo (H de 0 a 179) | Funciona |
+| `scripts/track_flights.py` | Sigue los vuelos en vivo y registra sus fichas | Funciona |
 | `scripts/calibrate_camera.py` | Calibra y guarda K, distorsión y RMS | Funciona |
 | `scripts/main.py` | Flujo completo; sin opciones, webcam con FPS | Parcial |
 | `scripts/run_security.py` | Solo el desbloqueo con la webcam | Pendiente |
@@ -182,13 +193,14 @@ python -m pytest -q
 │   ├── detection/             interfaz + classic + coco
 │   ├── tracking/              interfaz + flujo óptico LK + meanShift + gestor
 │   ├── classification/        interfaz + bow + cnn + llegada/salida
-│   ├── identification/        cliente OpenSky, emparejamiento, ficha
+│   ├── identification/        ADS-B, adsbdb, OpenSky, emparejamiento, ficha
 │   ├── visualization/         cajas, ficha superpuesta, FPS incrustado
 │   └── extensions/            SOLO stubs de las ampliaciones
 ├── scripts/                   puntos de entrada ejecutables
 ├── notebooks/                 exploración y figuras del informe
 ├── calibration/images|results fotos del tablero y K, distorsión, RMS (se versiona)
 ├── assets/cards/              las 16 tarjetas imprimibles
+├── assets/data/               base de aeropuertos (se versiona)
 ├── data/                      clips, fotogramas, anotaciones, splits (ignorado por git)
 ├── models/                    vocabularios BoW, SVM, pesos (ignorado por git)
 ├── results/                   salidas por módulo, incluida la secuencia de transformación
@@ -222,7 +234,7 @@ python -m pytest -q
 | `classification.bow` | SIFT + K-means + SVM | Pendiente |
 | `classification.cnn` | CNN propia | Opcional, pendiente |
 | `classification.arrival_departure` | Llegada o salida | Pendiente |
-| `identification` | OpenSky, emparejamiento, ficha | Pendiente |
+| `identification` | ADS-B, adsbdb, OpenSky, emparejamiento, ficha | **Hecho** |
 | `visualization` | Cajas, ficha, FPS incrustado | Pendiente |
 | `extensions` | Las cuatro ampliaciones | Stubs, NO base |
 
@@ -272,6 +284,18 @@ fuera del entorno base, en un extra que se instala aparte:
 ```bash
 pip install -e ".[dl]"
 ```
+
+**La identificación va en vivo, aunque el sistema trabaje sobre clips.** Los datos ADS-B
+son efímeros: dicen qué aviones hay *ahora* sobre la pista. Por eso
+`scripts/track_flights.py` tiene que ejecutarse **a la vez** que `scripts/record_clips.py`:
+un clip grabado sin el seguimiento en marcha se queda sin ficha. Las fichas se guardan con
+su marca de tiempo UNIX y después se cruzan con los clips.
+
+**Dos fuentes para llegada o salida.** El sistema lo deduce **por visión**
+(frente/espaldas + sentido de uso de la pista), que es lo que pide el enunciado y lo que
+se evalúa. Los datos ADS-B lo dicen también, por el historial de alturas, pero esa vía no
+se usa para rellenar la salida del clasificador: sirve como **etiqueta de referencia**
+para entrenarlo y medirlo.
 
 **Los clips no se publican.** Los clips grabados del directo y los fotogramas extraídos
 quedan fuera del repositorio: `data/` está en `.gitignore` salvo su `README.md`. La

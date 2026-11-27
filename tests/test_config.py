@@ -237,10 +237,20 @@ def test_card_fields_exclude_dynamic_data() -> None:
 
 
 def test_credentials_are_read_from_environment_variable_names() -> None:
-    """La configuracion guarda NOMBRES de variables de entorno, no credenciales."""
+    """La configuracion guarda NOMBRES de variables de entorno, no credenciales.
+
+    OpenSky usa OAuth2 `client_credentials`, no usuario y contrasena.
+    """
     identification = get_config().identification
-    assert identification.username_env_var == "OPENSKY_USERNAME"
-    assert identification.password_env_var == "OPENSKY_PASSWORD"
+    assert identification.client_id_env_var == "OPENSKY_CLIENT_ID"
+    assert identification.client_secret_env_var == "OPENSKY_CLIENT_SECRET"
+
+
+def test_card_labels_cover_every_card_field() -> None:
+    """Todos los campos de la ficha tienen etiqueta para mostrarla."""
+    identification = get_config().identification
+    for name in identification.card_fields:
+        assert name in identification.card_labels, f"Falta la etiqueta de '{name}'"
 
 
 # --- Depuracion -------------------------------------------------------------
