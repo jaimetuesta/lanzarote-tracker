@@ -16,10 +16,16 @@ from lanzarote_tracker.security.segmentation import (
     segment_card,
 )
 from lanzarote_tracker.security.sequence_fsm import FrameObservation, SequenceFsm
+from lanzarote_tracker.security.hsv_tuning import (
+    format_ranges,
+    hue_bounds,
+    sample_hsv_range,
+)
 from lanzarote_tracker.security.shape_classifier import (
     approximate_polygon,
     circularity,
     classify_shape,
+    is_square,
 )
 from lanzarote_tracker.security.types import BoundingBox, Card, Color, SecurityState, Shape
 
@@ -33,9 +39,13 @@ __all__ = [
     "segment_card",
     "FrameObservation",
     "SequenceFsm",
+    "format_ranges",
+    "hue_bounds",
+    "sample_hsv_range",
     "approximate_polygon",
     "circularity",
     "classify_shape",
+    "is_square",
     "BoundingBox",
     "Card",
     "Color",

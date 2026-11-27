@@ -14,10 +14,17 @@ from __future__ import annotations
 
 from typing import Optional
 
+import cv2
 import numpy as np
 
 from lanzarote_tracker.common.debug import DebugRecorder
 from lanzarote_tracker.config import SecurityConfig
+from lanzarote_tracker.security.segmentation import segment_card
+from lanzarote_tracker.security.shape_classifier import (
+    approximate_polygon,
+    circularity,
+    classify_shape,
+)
 from lanzarote_tracker.security.types import Card
 
 Image = np.ndarray
@@ -39,11 +46,26 @@ def read_card(
         recorder: Registro opcional de la secuencia de transformacion.
 
     Returns:
-        La tarjeta reconocida, o None si en este fotograma no hay ninguna.
+        La tarjeta reconocida, o None si en este fotograma no hay ninguna o si
+        su forma no encaja en las cuatro admitidas.
     """
-    raise NotImplementedError(
-        "Pendiente: read_card (security/card_reader.py). "
-        "segment_card + classify_shape."
+    found = segment_card(frame, config, recorder=recorder)
+    if found is None:
+        return None
+
+    color, contour = found
+    shape = classify_shape(contour, config)
+    if shape is None:
+        return None
+
+    x, y, width, height = cv2.boundingRect(contour)
+    return Card(
+        shape=shape,
+        color=color,
+        bbox=(int(x), int(y), int(width), int(height)),
+        area=float(cv2.contourArea(contour)),
+        circularity=circularity(contour),
+        vertices=len(approximate_polygon(contour, config)),
     )
 
 
@@ -54,6 +76,10 @@ class StableCardReader:
     se lleva sin ver ninguna. La maquina de estados usa ambos contadores: el
     primero para confirmar una lectura y el segundo para exigir el hueco entre
     tarjetas.
+
+    Lo que se compara entre fotogramas es `Card.key`, es decir, forma y color.
+    El area y la caja cambian en cada fotograma aunque la tarjeta este quieta,
+    asi que compararlas enteras no confirmaria nunca.
 
     Attributes:
         config: Configuracion de seguridad.
@@ -66,9 +92,10 @@ class StableCardReader:
             config: Configuracion de seguridad, de la que se toma N
                 (`consecutive_frames`).
         """
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.__init__ (security/card_reader.py)."
-        )
+        self.config: SecurityConfig = config
+        self._current: Optional[Card] = None
+        self._stable_frames: int = 0
+        self._empty_frames: int = 0
 
     def update(
         self,
@@ -79,7 +106,9 @@ class StableCardReader:
 
         Devuelve la tarjeta solo en el fotograma en el que se completan los N
         fotogramas consecutivos con la misma lectura; en los demas devuelve
-        None, aunque se este viendo una tarjeta.
+        None, aunque se este viendo una tarjeta. Si la tarjeta se mantiene
+        delante de la camara, el contador sigue subiendo pero NO se vuelve a
+        confirmar: una tarjeta quieta es una lectura, no muchas.
 
         Args:
             frame: Fotograma BGR.
@@ -88,37 +117,56 @@ class StableCardReader:
         Returns:
             La tarjeta confirmada en este fotograma, o None.
         """
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.update (security/card_reader.py). "
-            "read_card + contador de fotogramas consecutivos iguales."
-        )
+        card = read_card(frame, self.config, recorder=recorder)
+
+        if card is None:
+            self._current = None
+            self._stable_frames = 0
+            self._empty_frames += 1
+            return None
+
+        self._empty_frames = 0
+        if self._current is not None and card.key == self._current.key:
+            self._stable_frames += 1
+        else:
+            self._stable_frames = 1
+        self._current = card
+
+        if self._stable_frames == self.config.consecutive_frames:
+            return card
+        return None
 
     @property
     def current_card(self) -> Optional[Card]:
         """Tarjeta que se esta viendo ahora mismo, confirmada o no."""
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.current_card (security/card_reader.py)."
-        )
+        return self._current
 
     @property
     def stable_frames(self) -> int:
         """Fotogramas consecutivos con la misma lectura acumulados hasta ahora."""
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.stable_frames (security/card_reader.py)."
-        )
+        return self._stable_frames
 
     @property
     def empty_frames(self) -> int:
         """Fotogramas consecutivos sin ninguna tarjeta a la vista."""
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.empty_frames (security/card_reader.py)."
-        )
+        return self._empty_frames
+
+    @property
+    def progress(self) -> float:
+        """Fraccion de los N fotogramas ya acumulada, entre 0 y 1.
+
+        Sirve para dibujar una barra de progreso mientras se sostiene la
+        tarjeta, que es lo que hace entendible la espera.
+        """
+        if self.config.consecutive_frames <= 0:
+            return 1.0
+        return min(1.0, self._stable_frames / float(self.config.consecutive_frames))
 
     def reset(self) -> None:
         """Olvida los contadores y la tarjeta en curso."""
-        raise NotImplementedError(
-            "Pendiente: StableCardReader.reset (security/card_reader.py)."
-        )
+        self._current = None
+        self._stable_frames = 0
+        self._empty_frames = 0
 
 
 __all__ = ["read_card", "StableCardReader"]

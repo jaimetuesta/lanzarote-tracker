@@ -18,6 +18,7 @@ Uso::
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -78,25 +79,23 @@ def run_preview(config: AppConfig) -> int:
 
 
 def run_security(config: AppConfig) -> int:
-    """Ejecutara el desbloqueo por secuencia de tarjetas con la webcam.
+    """Ejecuta el desbloqueo por secuencia de tarjetas con la webcam.
+
+    Delega en `scripts/run_security.py`, que es donde vive el bucle, para no
+    tener dos copias del mismo codigo.
 
     Args:
         config: Configuracion de la aplicacion.
 
     Returns:
-        0 si el usuario se desbloquea.
-
-    Raises:
-        NotImplementedError: Mientras el bloque de seguridad no este implementado.
+        0 si el usuario se desbloquea, 1 si no.
     """
-    raise NotImplementedError(
-        "El bloque de seguridad todavia no esta completo. La maquina de "
-        "estados ya esta implementada; faltan la vision: "
-        "security/segmentation.py, security/shape_classifier.py y "
-        "security/card_reader.py. "
-        "Ejecuta `python scripts/main.py` sin opciones para la vista previa de "
-        "la webcam, que si funciona."
-    )
+    # scripts/ no es un paquete, asi que se anade al path para poder reutilizar
+    # el bucle en vez de duplicarlo aqui.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from run_security import run as run_security_loop
+
+    return run_security_loop(config)
 
 
 def run_tracker(config: AppConfig, clip_path: Path) -> int:
@@ -135,8 +134,8 @@ def main() -> int:
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
-            "Estado: el bloque de seguridad y el tracker estan por implementar; "
-            "con --security o --tracker el script falla indicando que falta."
+            "Estado: el bloque de seguridad YA funciona (--security). El tracker "
+            "sigue por implementar y con --tracker el script indica que falta."
         ),
     )
     config = get_config()

@@ -142,12 +142,9 @@ class CalibrationConfig:
 #: hay que volver a medirlos sobre las tarjetas impresas antes de dar por buena
 #: la robustez del sistema, y contar las dos medidas en el informe.
 DEFAULT_HSV_RANGES: Dict[str, Tuple[HsvRange, ...]] = {
-    # TODO: el segundo tramo del rojo esta a medias. Al medirlo, la ventana
-    # solo mostraba el tramo (170..179) y el otro se perdio con el fallo de
-    # impresion; el 10 de aqui es provisional y hay que volver a medir el rojo.
     "red": (
-        ((0, 170, 133), (10, 255, 255)),
-        ((170, 170, 133), (MAX_HUE, 255, 255)),
+        ((0, 174, 155), (6, 255, 255)),
+        ((169, 174, 155), (MAX_HUE, 255, 255)),
     ),
     "green": (((60, 190, 137), (77, 255, 255)),),
     "blue": (((98, 175, 192), (114, 255, 255)),),
@@ -198,8 +195,15 @@ class SecurityConfig:
     # --- Clasificacion de forma ----------------------------------------------
     #: Factor epsilon de cv2.approxPolyDP como fraccion del perimetro.
     approx_poly_epsilon_ratio: float = 0.04
-    #: Circularidad C = 4*pi*A / P^2 por encima de la cual la forma es un circulo.
-    circularity_threshold: float = 0.80
+    #: Circularidad C = 4*pi*A / P^2 por encima de la cual la forma es un
+    #: circulo. Medido sobre las tarjetas generadas: triangulo 0.566, cuadrado
+    #: 0.791, pentagono 0.785, circulo 0.897. El circulo no llega a 1.0 porque
+    #: cv2.arcLength recorre el borde en escalera y sobreestima el perimetro de
+    #: una curva. El umbral va entre el cuadrado y el circulo, y ademas la
+    #: circularidad SOLO se consulta cuando los vertices no dan 3, 4 ni 5
+    #: (ver security/shape_classifier.py), asi que un cuadrado nunca llega a
+    #: compararse contra el.
+    circularity_threshold: float = 0.82
     #: Numero de vertices de approxPolyDP por forma poligonal.
     vertices_by_shape: Dict[str, int] = field(
         default_factory=lambda: {"triangle": 3, "square": 4, "pentagon": 5}

@@ -142,7 +142,7 @@ Todos los scripts aceptan `--help`.
 | `scripts/track_flights.py` | Sigue los vuelos en vivo y registra sus fichas | Funciona |
 | `scripts/calibrate_camera.py` | Calibra y guarda K, distorsión y RMS | Funciona |
 | `scripts/main.py` | Flujo completo; sin opciones, webcam con FPS | Parcial |
-| `scripts/run_security.py` | Solo el desbloqueo con la webcam | Pendiente |
+| `scripts/run_security.py` | Solo el desbloqueo con la webcam | Funciona |
 | `scripts/record_clips.py` | Graba clips del directo con metadatos | Funciona |
 | `scripts/extract_frames.py` | Extrae fotogramas de los clips | Funciona |
 | `scripts/build_dataset.py` | División train/val/test por clips completos | Funciona |
@@ -220,9 +220,9 @@ python -m pytest -q
 | `capture.stream_url` | URL del directo con yt-dlp | **Hecho** |
 | `security.types` | Formas, colores, tarjeta, estados | **Hecho** |
 | `calibration` | Tablero, calibración pinhole, corrección, guardado | **Hecho** |
-| `security.segmentation` | HSV, morfología, contorno mayor | Pendiente |
-| `security.shape_classifier` | `approxPolyDP` + circularidad | Pendiente |
-| `security.card_reader` | Validación temporal de N fotogramas | Pendiente |
+| `security.segmentation` | HSV, morfología, contorno mayor | **Hecho** |
+| `security.shape_classifier` | `approxPolyDP` + circularidad | **Hecho** |
+| `security.card_reader` | Validación temporal de N fotogramas | **Hecho** |
 | `security.sequence_fsm` | Máquina de estados del desbloqueo | **Hecho** |
 | `capture.recorder` | Clips con metadatos UTC, disparo por ADS-B | **Hecho** |
 | `capture.frames` | Fotogramas y división por clips | **Hecho** |
