@@ -64,6 +64,8 @@ _extra_range: Optional[HsvRange] = None
 _last_frame: Optional[Image] = None
 #: Escala entre la vista mostrada y el fotograma original.
 _scale: float = 1.0
+#: Color que se esta ajustando, para poder imprimirlo ya al hacer clic.
+_color: str = "red"
 
 
 def _noop(value: int) -> None:
@@ -128,6 +130,9 @@ def on_mouse(event: int, x: int, y: int, flags: int, param: object) -> None:
         _logger.info(
             "El tono cruza la costura del circulo: es un rojo. Se usan dos rangos."
         )
+    # Se imprime YA, no solo al salir: asi la medida no se pierde pase lo que
+    # pase despues, y se puede copiar sin cerrar la ventana.
+    print(format_ranges(_color, ranges), flush=True)
 
 
 def create_window(initial: Tuple[int, int, int, int, int, int]) -> None:
@@ -245,8 +250,9 @@ def run(config: AppConfig, image_path: Optional[Path], color: str) -> int:
     Returns:
         0 si termina correctamente, 1 si no hay fuente de imagen.
     """
-    global _last_frame
+    global _last_frame, _color
 
+    _color = color
     static_frame: Optional[Image] = None
     capture = None
 
@@ -268,6 +274,12 @@ def run(config: AppConfig, image_path: Optional[Path], color: str) -> int:
         "Haz CLIC sobre la figura de color para medir su rango. "
         "Sal con 'q' o ESC para imprimirlo."
     )
+
+    # Se guarda el ultimo rango visto DENTRO del bucle. No se puede leer los
+    # deslizadores despues, porque para entonces la ventana ya no existe y
+    # cv2.getTrackbarPos falla justo al ir a imprimir el resultado, que es lo
+    # unico que se queria de toda la ejecucion.
+    ranges: Tuple[HsvRange, ...] = (((0, 0, 0), (MAX_HUE, 255, 255)),)
 
     try:
         while True:
@@ -294,7 +306,7 @@ def run(config: AppConfig, image_path: Optional[Path], color: str) -> int:
             capture.release()
         cv2.destroyAllWindows()
 
-    print_result(color, current_ranges())
+    print_result(color, ranges)
     return 0
 
 
