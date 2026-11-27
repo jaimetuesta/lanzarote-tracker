@@ -1,24 +1,24 @@
-"""Ajuste en vivo de los rangos HSV con trackbars.
+"""Ajuste de los rangos HSV de las tarjetas, con clic o con deslizadores.
 
-Adaptado del `get_hsv_color_ranges` de la Practica 1, con dos cambios:
+COMO SE USA, en corto:
 
-- el tono H va de 0 a 179, que es el rango real de OpenCV (la practica usaba
-  valores de 0 a 255 en algunos apartados y eso descuadra los umbrales);
-- trabaja sobre la webcam en vivo, no sobre una imagen fija, para poder mover la
-  tarjeta y ver como aguanta el umbral con los cambios de luz.
+1. Pon una tarjeta delante de la camara.
+2. **Haz clic encima de la figura de color.** El rango se calcula solo a partir
+   de los pixeles que hay bajo el cursor.
+3. Mira la vista del medio: tiene que quedar BLANCA sobre la figura y NEGRA en
+   todo lo demas. Si no, haz clic en otro punto o retoca los deslizadores.
+4. Sal con 'q' o ESC. Se imprime la linea lista para pegar en `config.py`.
+5. Repite con cada color. El ROJO se resuelve solo: al hacer clic se detecta
+   que cruza la costura del circulo cromatico y se imprimen sus DOS rangos.
 
-Al salir imprime los rangos elegidos en el formato exacto de
-`SecurityConfig.hsv_ranges`, listos para pegarlos en `config.py`.
-
-RECORDATORIO sobre el rojo: su tono esta partido por el extremo del circulo
-cromatico, asi que NO se puede capturar con un solo rango. Este script ajusta
-un rango cada vez; para el rojo hay que ajustar dos (uno con H cerca de 0 y otro
-con H cerca de 179) y unirlos en la configuracion.
+Adaptado del `get_hsv_color_ranges` de la Practica 1, con dos cambios: el tono
+va de 0 a 179, que es el rango real de OpenCV, y se mide la muestra en vez de
+ajustar a ojo, que es mas rapido y se puede justificar en el informe.
 
 Uso::
 
-    python scripts/tune_hsv.py
-    python scripts/tune_hsv.py --image assets/cards/circle_red.png
+    python scripts/tune_hsv.py --color red
+    python scripts/tune_hsv.py --image assets/cards/circle_red.png --color red
 """
 
 from __future__ import annotations
@@ -26,21 +26,27 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
 
 from lanzarote_tracker.common.io_utils import is_quit_key, load_image, open_camera
 from lanzarote_tracker.common.log import get_logger, setup_logging
-from lanzarote_tracker.config import MAX_HUE, AppConfig, get_config
+from lanzarote_tracker.config import MAX_HUE, AppConfig, HsvRange, get_config
+from lanzarote_tracker.security.hsv_tuning import format_ranges, sample_hsv_range
 
 _logger = get_logger(__name__)
 
 Image = np.ndarray
 
-WINDOW_NAME = "Ajuste HSV - 'q' o ESC para salir"
-#: Nombre de cada trackbar y su valor maximo. H llega a 179, S y V a 255.
+WINDOW_NAME = "Ajuste HSV - clic sobre la figura, 'q' o ESC para salir"
+#: Ancho de cada una de las tres vistas, en pixeles. Fijo para que las
+#: coordenadas del raton se puedan convertir a las del fotograma.
+PANE_WIDTH = 460
+#: Lado del cuadrado que se muestrea alrededor del clic.
+SAMPLE_PATCH = 15
+
 TRACKBARS: Tuple[Tuple[str, int], ...] = (
     ("H min", MAX_HUE),
     ("H max", MAX_HUE),
@@ -49,6 +55,15 @@ TRACKBARS: Tuple[Tuple[str, int], ...] = (
     ("V min", 255),
     ("V max", 255),
 )
+
+#: Segundo rango, cuando el color cruza la costura (el rojo). Los deslizadores
+#: solo pueden representar uno, asi que el otro se guarda aqui y se usa tanto
+#: para la mascara que se ve como para lo que se imprime al salir.
+_extra_range: Optional[HsvRange] = None
+#: Ultimo fotograma, para poder muestrearlo desde el callback del raton.
+_last_frame: Optional[Image] = None
+#: Escala entre la vista mostrada y el fotograma original.
+_scale: float = 1.0
 
 
 def _noop(value: int) -> None:
@@ -60,75 +75,178 @@ def _noop(value: int) -> None:
     return None
 
 
+def set_trackbars(low: Tuple[int, int, int], high: Tuple[int, int, int]) -> None:
+    """Coloca los deslizadores en un rango concreto.
+
+    Args:
+        low: Extremo inferior (H, S, V).
+        high: Extremo superior (H, S, V).
+    """
+    for name, value in zip(
+        ("H min", "H max", "S min", "S max", "V min", "V max"),
+        (low[0], high[0], low[1], high[1], low[2], high[2]),
+    ):
+        cv2.setTrackbarPos(name, WINDOW_NAME, int(value))
+
+
+def on_mouse(event: int, x: int, y: int, flags: int, param: object) -> None:
+    """Muestrea el color bajo el cursor al hacer clic.
+
+    Funciona en cualquiera de las tres vistas: se toma el resto de dividir por
+    el ancho de una vista, asi que da igual si se pincha en el original, en la
+    mascara o en el resultado.
+
+    Args:
+        event: Tipo de evento de raton.
+        x: Coordenada x en la ventana.
+        y: Coordenada y en la ventana.
+        flags: Banderas del evento, sin usar.
+        param: Parametro de usuario, sin usar.
+    """
+    global _extra_range
+    if event != cv2.EVENT_LBUTTONDOWN or _last_frame is None:
+        return
+
+    # De coordenadas de la ventana a coordenadas del fotograma.
+    frame_x = int((x % PANE_WIDTH) / _scale)
+    frame_y = int(y / _scale)
+    height, width = _last_frame.shape[:2]
+    half = SAMPLE_PATCH // 2
+    x0, x1 = max(0, frame_x - half), min(width, frame_x + half + 1)
+    y0, y1 = max(0, frame_y - half), min(height, frame_y + half + 1)
+
+    hsv = cv2.cvtColor(_last_frame, cv2.COLOR_BGR2HSV)
+    try:
+        ranges = sample_hsv_range(hsv[y0:y1, x0:x1])
+    except ValueError as error:
+        _logger.warning("%s", error)
+        return
+
+    set_trackbars(*ranges[0])
+    _extra_range = ranges[1] if len(ranges) > 1 else None
+    if _extra_range is not None:
+        _logger.info(
+            "El tono cruza la costura del circulo: es un rojo. Se usan dos rangos."
+        )
+
+
 def create_window(initial: Tuple[int, int, int, int, int, int]) -> None:
-    """Crea la ventana con los seis trackbars.
+    """Crea la ventana con los seis deslizadores y el callback del raton.
 
     Args:
         initial: Valores iniciales en el orden (H min, H max, S min, S max,
             V min, V max).
     """
-    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINDOW_NAME, 900, 700)
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
     for (name, maximum), value in zip(TRACKBARS, initial):
         cv2.createTrackbar(name, WINDOW_NAME, int(value), maximum, _noop)
+    cv2.setMouseCallback(WINDOW_NAME, on_mouse)
 
 
-def read_trackbars() -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
-    """Lee el rango HSV actual de los trackbars.
+def read_trackbars() -> HsvRange:
+    """Lee el rango HSV actual de los deslizadores.
 
     Returns:
         El par ((H,S,V) minimo, (H,S,V) maximo).
     """
     values = [cv2.getTrackbarPos(name, WINDOW_NAME) for name, _ in TRACKBARS]
-    low = (values[0], values[2], values[4])
-    high = (values[1], values[3], values[5])
-    return low, high
+    return (values[0], values[2], values[4]), (values[1], values[3], values[5])
 
 
-def build_view(frame: Image, low: Tuple[int, int, int], high: Tuple[int, int, int]) -> Image:
-    """Compone la vista con el fotograma, la mascara y el resultado enmascarado.
+def current_ranges() -> Tuple[HsvRange, ...]:
+    """Devuelve los rangos activos, que son dos si el color cruza la costura.
+
+    Returns:
+        Uno o dos rangos.
+    """
+    ranges: List[HsvRange] = [read_trackbars()]
+    if _extra_range is not None:
+        ranges.append(_extra_range)
+    return tuple(ranges)
+
+
+def build_mask(frame: Image, ranges: Tuple[HsvRange, ...]) -> Image:
+    """Construye la mascara uniendo todos los rangos activos.
+
+    Practica 1: cv2.inRange por rango y cv2.bitwise_or para unirlos.
 
     Args:
         frame: Fotograma BGR.
-        low: Extremo inferior del rango HSV.
-        high: Extremo superior del rango HSV.
+        ranges: Rangos activos.
 
     Returns:
-        Una imagen con las tres vistas apiladas horizontalmente.
+        La mascara binaria.
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, np.array(low, dtype=np.uint8), np.array(high, dtype=np.uint8))
-    masked = cv2.bitwise_and(frame, frame, mask=mask)
-    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    return np.hstack([frame, mask_bgr, masked])
+    mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+    for low, high in ranges:
+        piece = cv2.inRange(
+            hsv, np.array(low, dtype=np.uint8), np.array(high, dtype=np.uint8)
+        )
+        mask = cv2.bitwise_or(mask, piece)
+    return mask
 
 
-def print_range(low: Tuple[int, int, int], high: Tuple[int, int, int]) -> None:
-    """Imprime el rango en el formato de `SecurityConfig.hsv_ranges`.
+def build_view(frame: Image, mask: Image) -> Image:
+    """Compone el fotograma, la mascara y el resultado enmascarado.
 
     Args:
-        low: Extremo inferior del rango HSV.
-        high: Extremo superior del rango HSV.
+        frame: Fotograma BGR.
+        mask: Mascara binaria.
+
+    Returns:
+        Las tres vistas una al lado de la otra, ya escaladas.
+    """
+    global _scale
+    _scale = PANE_WIDTH / float(frame.shape[1])
+    size = (PANE_WIDTH, max(int(round(frame.shape[0] * _scale)), 1))
+
+    masked = cv2.bitwise_and(frame, frame, mask=mask)
+    panes = [
+        cv2.resize(frame, size, interpolation=cv2.INTER_AREA),
+        cv2.resize(cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), size, interpolation=cv2.INTER_AREA),
+        cv2.resize(masked, size, interpolation=cv2.INTER_AREA),
+    ]
+    for pane, text in zip(panes, ("original", "mascara", "resultado")):
+        cv2.putText(
+            pane, text, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA
+        )
+    return np.hstack(panes)
+
+
+def print_result(color: str, ranges: Tuple[HsvRange, ...]) -> None:
+    """Imprime los rangos elegidos listos para pegar en la configuracion.
+
+    Args:
+        color: Nombre del color ajustado.
+        ranges: Rangos activos.
     """
     print()
-    print("Rango elegido, listo para pegar en config.DEFAULT_HSV_RANGES:")
-    print(f'    "<color>": ((({low[0]}, {low[1]}, {low[2]}), ({high[0]}, {high[1]}, {high[2]})),),')
+    print("Pega esta linea en DEFAULT_HSV_RANGES, en src/lanzarote_tracker/config.py:")
     print()
-    print("Para el ROJO hacen falta DOS rangos (H cerca de 0 y H cerca de 179):")
-    print('    "red": (((0, S, V), (10, 255, 255)), ((170, S, V), (179, 255, 255))),')
+    print(format_ranges(color, ranges))
     print()
+    if len(ranges) == 1 and color == "red":
+        print(
+            "AVISO: para el rojo esperaba DOS rangos y solo hay uno. Vuelve a "
+            "hacer clic en el centro de la figura roja, no en su borde."
+        )
+        print()
 
 
-def run(config: AppConfig, image_path: Optional[Path]) -> int:
+def run(config: AppConfig, image_path: Optional[Path], color: str) -> int:
     """Ejecuta el ajuste, sobre la webcam o sobre una imagen fija.
 
     Args:
         config: Configuracion de la aplicacion.
         image_path: Imagen sobre la que ajustar. Si es None se usa la webcam.
+        color: Nombre del color que se esta ajustando, para el mensaje final.
 
     Returns:
         0 si termina correctamente, 1 si no hay fuente de imagen.
     """
+    global _last_frame
+
     static_frame: Optional[Image] = None
     capture = None
 
@@ -146,9 +264,11 @@ def run(config: AppConfig, image_path: Optional[Path]) -> int:
             return 1
 
     create_window((0, MAX_HUE, 0, 255, 0, 255))
-    _logger.info("Mueve los trackbars. Sal con 'q' o ESC para imprimir el rango.")
+    _logger.info(
+        "Haz CLIC sobre la figura de color para medir su rango. "
+        "Sal con 'q' o ESC para imprimirlo."
+    )
 
-    low, high = (0, 0, 0), (MAX_HUE, 255, 255)
     try:
         while True:
             if static_frame is not None:
@@ -161,8 +281,9 @@ def run(config: AppConfig, image_path: Optional[Path]) -> int:
                 if config.camera.mirror:
                     frame = cv2.flip(frame, 1)
 
-            low, high = read_trackbars()
-            cv2.imshow(WINDOW_NAME, build_view(frame, low, high))
+            _last_frame = frame
+            ranges = current_ranges()
+            cv2.imshow(WINDOW_NAME, build_view(frame, build_mask(frame, ranges)))
 
             if is_quit_key(cv2.waitKey(30) & 0xFF, config.camera.quit_keys):
                 break
@@ -173,7 +294,7 @@ def run(config: AppConfig, image_path: Optional[Path]) -> int:
             capture.release()
         cv2.destroyAllWindows()
 
-    print_range(low, high)
+    print_result(color, current_ranges())
     return 0
 
 
@@ -185,17 +306,23 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Ventana con trackbars para ajustar un rango HSV en vivo sobre la "
-            "webcam o sobre una imagen. Adaptado de la Practica 1, con H de 0 a "
-            "179. Al salir imprime el rango listo para pegar en config.py."
+            "Mide el rango HSV de una tarjeta. Haz clic sobre la figura de "
+            "color y el rango se calcula solo; los deslizadores quedan para "
+            "retocarlo. Al salir imprime la linea lista para pegar en config.py."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
-            "El rojo necesita DOS rangos unidos, uno con H cerca de 0 y otro con "
-            "H cerca de 179."
+            "El rojo cruza la costura del circulo cromatico y necesita DOS "
+            "rangos: al hacer clic se detecta y se imprimen los dos."
         ),
     )
     config = get_config()
+    parser.add_argument(
+        "--color",
+        default="red",
+        choices=sorted(config.security.hsv_ranges),
+        help="Color que se esta ajustando, para el mensaje final.",
+    )
     parser.add_argument(
         "--image",
         type=Path,
@@ -209,7 +336,7 @@ def main() -> int:
 
     setup_logging(config.debug)
     config = replace(config, camera=replace(config.camera, index=args.camera))
-    return run(config, args.image)
+    return run(config, args.image, args.color)
 
 
 if __name__ == "__main__":
